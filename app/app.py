@@ -36,225 +36,506 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── CSS ──────────────────────────────────────────────────────────────────────
+# ─── CSS — Editorial Terminal aesthetic ───────────────────────────────────────
+INK     = "#1A1D23"
+GOLD_DK = "#8B7340"
+
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,500&display=swap');
+
+:root {{
+    --ink: {INK};
+    --ink-soft: rgba(26, 29, 35, 0.55);
+    --ink-faint: rgba(26, 29, 35, 0.32);
+    --rule: rgba(26, 29, 35, 0.12);
+    --rule-strong: rgba(26, 29, 35, 0.35);
+    --gold-soft: rgba(201, 168, 106, 0.09);
+    --gold-mid: rgba(201, 168, 106, 0.32);
+}}
 
 #MainMenu, footer, header {{ visibility: hidden; }}
 
 html, body, [data-testid="stAppViewContainer"] {{
-    background: linear-gradient(135deg, {PLATINUM} 0%, {ICE_SILVER} 50%, {SILVER} 100%);
+    background:
+      radial-gradient(ellipse 80% 50% at top left, rgba(201, 168, 106, 0.07) 0%, transparent 55%),
+      radial-gradient(ellipse 80% 50% at bottom right, rgba(36, 3, 56, 0.05) 0%, transparent 55%),
+      linear-gradient(180deg, #FAFAF7 0%, #F3F2EE 100%);
     min-height: 100vh;
     font-family: 'IBM Plex Mono', monospace;
+    color: var(--ink);
 }}
 
+/* Paper grain overlay */
+[data-testid="stAppViewContainer"]::before {{
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+}}
+
+/* Sidebar — gilded charcoal */
 [data-testid="stSidebar"] {{
-    background: {GRAPHITE} !important;
-    border-right: 1px solid {ESPRESSO_GOLD}44;
+    background: linear-gradient(180deg, #20242C 0%, #161A21 100%) !important;
+    border-right: none;
+    position: relative;
+}}
+[data-testid="stSidebar"]::after {{
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, transparent 0%, {ESPRESSO_GOLD} 22%, {ESPRESSO_GOLD} 78%, transparent 100%);
+}}
+[data-testid="stSidebar"] * {{ color: #E6E8EB !important; }}
+[data-testid="stSidebar"] .stSelectbox label,
+[data-testid="stSidebar"] .stSlider label {{
+    color: rgba(176, 180, 184, 0.72) !important;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 400;
 }}
 
-[data-testid="stSidebar"] * {{ color: {ICE_SILVER} !important; }}
-[data-testid="stSidebar"] .stSelectbox label,
-[data-testid="stSidebar"] .stSlider label {{ color: {MIST} !important; font-size: 0.75rem; }}
-
-.main-header {{
-    font-family: 'Orbitron', monospace;
-    font-size: 2.4rem;
-    font-weight: 900;
-    color: {GRAPHITE_DEEP};
-    letter-spacing: 0.08em;
+/* Issue strip — newspaper masthead */
+.issue-strip {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.3em;
     text-transform: uppercase;
-    margin-bottom: 0.1rem;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.55rem 0;
+    margin: 0 0 1.3rem;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}}
+.issue-strip .dot {{
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: {SUCCESS};
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    box-shadow: 0 0 8px rgba(67, 147, 108, 0.65);
+    animation: pulse 2.2s ease-in-out infinite;
+}}
+@keyframes pulse {{
+    0%, 100% {{ opacity: 1; transform: scale(1); }}
+    50%      {{ opacity: 0.4; transform: scale(0.9); }}
+}}
+
+/* Hero header — editorial display */
+.main-header {{
+    font-family: 'Fraunces', Georgia, serif;
+    font-variation-settings: "opsz" 144;
+    font-size: 3.2rem;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.025em;
+    line-height: 1;
+    margin: 0.1rem 0;
+}}
+.main-header em {{
+    font-style: italic;
+    font-weight: 400;
+    color: {GOLD_DK};
 }}
 
 .sub-header {{
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.85rem;
-    color: {PEBBLE};
-    letter-spacing: 0.15em;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.24em;
     text-transform: uppercase;
-    margin-bottom: 1.5rem;
+    margin: 0.55rem 0 0;
+    padding-bottom: 1.3rem;
+    border-bottom: 2px solid var(--ink);
 }}
 
+/* Section header — Fraunces italic flanked by rules */
 .section-header {{
-    font-family: 'Orbitron', monospace;
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: {GRAPHITE_DEEP};
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin: 1rem 0 0.5rem;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+    margin: 1.8rem 0 1rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    line-height: 1.2;
+}}
+.section-header::before {{
+    content: '';
+    flex: 0 0 24px;
+    height: 1px;
+    background: {ESPRESSO_GOLD};
+    align-self: center;
+}}
+.section-header::after {{
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--rule);
+    align-self: center;
 }}
 
+/* Metric card — luxury detailing with bevel corners */
 .metric-card {{
-    background: white;
-    border: 1px solid {SILVER};
-    border-top: 3px solid {ESPRESSO_GOLD};
-    border-radius: 8px;
-    padding: 1rem 1.2rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 1.25rem 1.35rem 1rem;
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 1px 0 rgba(26,29,35,0.04);
+}}
+.metric-card::before {{
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px;
+    width: 14px; height: 14px;
+    border-top: 1.5px solid {ESPRESSO_GOLD};
+    border-left: 1.5px solid {ESPRESSO_GOLD};
+}}
+.metric-card::after {{
+    content: '';
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 14px; height: 14px;
+    border-bottom: 1.5px solid {ESPRESSO_GOLD};
+    border-right: 1.5px solid {ESPRESSO_GOLD};
 }}
 .metric-card:hover {{
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.10);
+    box-shadow: 0 14px 30px rgba(26, 29, 35, 0.08);
 }}
 .metric-label {{
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    color: {PEBBLE};
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.2;
 }}
 .metric-value {{
     font-family: 'Orbitron', monospace;
-    font-size: 1.8rem;
+    font-size: 2.1rem;
     font-weight: 700;
-    color: {GRAPHITE_DEEP};
-    margin: 0.15rem 0;
+    color: var(--ink);
+    margin: 0.4rem 0 0.15rem;
+    font-feature-settings: 'tnum';
+    letter-spacing: -0.02em;
+    line-height: 1;
 }}
 .metric-delta {{
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: {PEBBLE};
+    font-size: 0.62rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
 }}
 
+/* Prediction box — classified bulletin */
 .prediction-box {{
-    border-radius: 10px;
-    padding: 1.5rem 2rem;
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 1.7rem 1.9rem 1.4rem;
     margin: 1rem 0;
-    border-left: 5px solid;
+    position: relative;
+    box-shadow: 0 18px 50px rgba(26, 29, 35, 0.07);
 }}
-.prediction-box.success {{
-    background: {SUCCESS}18;
-    border-color: {SUCCESS};
-    color: {GRAPHITE};
+.prediction-box::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 4px;
 }}
-.prediction-box.warning {{
-    background: {WARNING_COL}20;
-    border-color: {WARNING_COL};
-    color: {GRAPHITE};
-}}
-.prediction-box.danger {{
-    background: {DANGER}18;
-    border-color: {DANGER};
-    color: {GRAPHITE};
+.prediction-box.success::before {{ background: {SUCCESS}; }}
+.prediction-box.warning::before {{ background: {WARNING_COL}; }}
+.prediction-box.danger::before  {{ background: {DANGER}; }}
+
+.pred-stamp {{
+    position: absolute;
+    top: 1rem; right: 1.2rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.32em;
+    color: var(--ink-soft);
+    background: var(--gold-soft);
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--gold-mid);
+    text-transform: uppercase;
 }}
 
+.prediction-label {{
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink-soft);
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 1;
+    margin-bottom: 0.2rem;
+}}
 .prediction-value {{
     font-family: 'Orbitron', monospace;
-    font-size: 3rem;
+    font-size: 3.6rem;
     font-weight: 900;
     line-height: 1;
-}}
-.prediction-label {{
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    opacity: 0.75;
-    margin-bottom: 0.3rem;
+    margin: 0.2rem 0;
+    font-feature-settings: 'tnum';
+    letter-spacing: -0.03em;
 }}
 .prediction-advisory {{
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.85rem;
-    margin-top: 0.6rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    margin-top: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    padding: 0.55rem 0.85rem;
+    background: rgba(26,29,35,0.035);
+    border-left: 2px solid {ESPRESSO_GOLD};
 }}
 
+/* Input card */
 .input-card {{
-    background: white;
-    border: 1px solid {SILVER};
-    border-radius: 8px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 0.8rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 1.25rem 1.5rem 1rem;
+    margin-bottom: 0.9rem;
+    box-shadow: 0 1px 0 rgba(26,29,35,0.04);
+    position: relative;
 }}
 .input-card-header {{
-    font-family: 'Orbitron', monospace;
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: 0;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.95rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}}
+.input-card-header::before {{
+    content: '§';
     color: {ESPRESSO_GOLD};
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    border-bottom: 1px solid {ESPRESSO_GOLD}44;
-    padding-bottom: 0.4rem;
-    margin-bottom: 0.8rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 0.95rem;
 }}
 
+/* Info box — gold-tinted citation */
 .info-box {{
-    background: {INFO}12;
-    border-left: 4px solid {INFO};
-    border-radius: 0 6px 6px 0;
-    padding: 0.8rem 1rem;
+    background: var(--gold-soft);
+    border-left: 2px solid {ESPRESSO_GOLD};
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 0.95rem 1.1rem;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.78rem;
-    color: {SLATE};
+    color: var(--ink);
     margin: 0.5rem 0;
+    line-height: 1.65;
 }}
 
-.stockout-row-high {{ background: {DANGER}15 !important; }}
-.stockout-row-medium {{ background: {WARNING_COL}15 !important; }}
+.stockout-row-high   {{ background: rgba(217, 107, 95, 0.10) !important; }}
+.stockout-row-medium {{ background: rgba(242, 174, 74, 0.10) !important; }}
 
+/* HR — editorial rule */
 hr {{
     border: none;
     height: 1px;
-    background: linear-gradient(90deg, transparent, {ESPRESSO_GOLD}, transparent);
-    margin: 1.2rem 0;
+    background: linear-gradient(90deg, transparent, var(--ink) 25%, var(--ink) 75%, transparent);
+    opacity: 0.25;
+    margin: 1.5rem 0;
 }}
 
+/* Tabs — newspaper section nav */
 .stTabs [data-baseweb="tab-list"] {{
-    gap: 6px;
-    background: rgba(42, 48, 56, 0.04);
-    border-radius: 10px;
-    padding: 6px;
-    border-bottom: 1px solid {SILVER};
+    gap: 0;
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 1.3rem;
 }}
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] {{
     background: transparent !important;
     height: 0 !important;
 }}
 .stTabs [data-baseweb="tab"] {{
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    border-radius: 7px;
-    color: {SLATE};
-    padding: 0.55rem 1.4rem;
-    transition: all 0.15s ease;
+    border-radius: 0;
+    color: var(--ink-faint);
+    padding: 0.78rem 1.5rem;
+    transition: all 0.2s ease;
     background: transparent;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    font-weight: 500;
 }}
 .stTabs [data-baseweb="tab"]:hover {{
-    background: rgba(201, 168, 106, 0.12);
-    color: {GRAPHITE};
+    color: var(--ink);
+    background: var(--gold-soft);
 }}
 .stTabs [aria-selected="true"] {{
-    background: linear-gradient(135deg, {ESPRESSO_GOLD} 0%, #B89858 100%) !important;
-    color: {GRAPHITE_DEEP} !important;
-    font-weight: 700 !important;
-    box-shadow: 0 2px 6px rgba(36, 3, 56, 0.18);
+    background: transparent !important;
+    color: var(--ink) !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid {ESPRESSO_GOLD} !important;
+    box-shadow: none;
 }}
 
+/* Button — editorial CTA */
 [data-testid="stButton"] > button {{
-    background: {ESPRESSO_GOLD};
-    color: {GRAPHITE};
-    font-family: 'Orbitron', monospace;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    background: var(--ink);
+    color: #FAFAF7;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.74rem;
+    font-weight: 500;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
-    border: none;
-    border-radius: 6px;
-    padding: 0.6rem 2rem;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 0.78rem 2rem;
     width: 100%;
-    transition: background 0.15s ease;
+    transition: all 0.18s ease;
 }}
 [data-testid="stButton"] > button:hover {{
-    background: {GRAPHITE_DEEP};
-    color: {ESPRESSO_GOLD};
+    background: {ESPRESSO_GOLD};
+    color: var(--ink);
+    border-color: {ESPRESSO_GOLD};
+    letter-spacing: 0.26em;
 }}
+
+/* Streamlit form controls polish */
+[data-baseweb="select"] > div {{
+    border-radius: 0 !important;
+    border-color: var(--rule) !important;
+}}
+.stSlider [data-baseweb="slider"] [role="slider"] {{
+    background: {ESPRESSO_GOLD} !important;
+    border: 2px solid var(--ink) !important;
+}}
+
+/* Plotly chart wrapper — framed paper card */
+[data-testid="stPlotlyChart"] {{
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    padding: 0.65rem 0.85rem;
+    box-shadow: 0 1px 0 rgba(26,29,35,0.04);
+    margin-bottom: 0.2rem;
+}}
+
+/* Fig caption — italic editorial */
+.fig-caption {{
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin: 0.3rem 0 1.2rem;
+    padding: 0.1rem 0 0.1rem 0.6rem;
+    border-left: 2px solid {ESPRESSO_GOLD};
+    line-height: 1.45;
+}}
+.fig-caption b {{
+    font-style: normal;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+    padding-right: 0.4rem;
+}}
+
+/* Sidebar branding */
+.sidebar-brand {{
+    text-align: left;
+    padding: 0.6rem 0 0.9rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 1rem;
+}}
+.sidebar-brand-mark {{
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 1.55rem;
+    color: {ESPRESSO_GOLD};
+    line-height: 1.1;
+    font-weight: 500;
+}}
+.sidebar-brand-mark span {{
+    font-style: normal;
+    color: #FAFAF7;
+    font-weight: 600;
+}}
+.sidebar-brand-id {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: rgba(176, 180, 184, 0.55) !important;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 0.55rem;
+}}
+
+.sidebar-pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.55rem;
+    border: 1px solid rgba(201, 168, 106, 0.4);
+    background: rgba(201, 168, 106, 0.08);
+    color: {ESPRESSO_GOLD} !important;
+}}
+.sidebar-pill .pd {{
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: {SUCCESS};
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(67, 147, 108, 0.7);
+    animation: pulse 2.2s ease-in-out infinite;
+}}
+
+/* Stagger fade-in for hero */
+@keyframes rise {{
+    from {{ opacity: 0; transform: translateY(10px); }}
+    to   {{ opacity: 1; transform: translateY(0); }}
+}}
+.issue-strip  {{ animation: rise 0.55s ease-out backwards; animation-delay: 0.02s; }}
+.main-header  {{ animation: rise 0.55s ease-out backwards; animation-delay: 0.10s; }}
+.sub-header   {{ animation: rise 0.55s ease-out backwards; animation-delay: 0.18s; }}
+
+/* Streamlit container neutralizing */
+.block-container {{ padding-top: 1.5rem !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -420,30 +701,26 @@ seasons     = sorted(df["Seasonality"].unique())
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"""
-    <div style='text-align:center; padding: 1rem 0 0.5rem;'>
-        <div style='font-family:Orbitron,monospace; font-size:1.1rem; font-weight:900;
-                    color:{ESPRESSO_GOLD}; letter-spacing:0.1em;'>📦 DEMAND INTEL</div>
-        <div style='font-family:"IBM Plex Mono",monospace; font-size:0.65rem;
-                    color:{MIST}; letter-spacing:0.12em; margin-top:0.2rem;'>
-            CRISP-ML(Q) · Oscar Ponce
-        </div>
+    <div class='sidebar-brand'>
+        <div class='sidebar-brand-mark'>Demand <span>Intel.</span></div>
+        <div class='sidebar-brand-id'>v02 · MMXXVI · OP</div>
+        <div style='margin-top:0.7rem;'><span class='sidebar-pill'><span class='pd'></span>Online</span></div>
     </div>
-    <hr style='border:none; height:1px; background:{ESPRESSO_GOLD}44; margin:0.8rem 0;'>
     """, unsafe_allow_html=True)
 
-    st.markdown(f"<div style='font-size:0.7rem; color:{MIST}; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.3rem;'>Dashboard Filters</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-family:\"Fraunces\",serif; font-style:italic; font-size:0.95rem; color:{MIST}; margin-bottom:0.3rem;'>Dashboard filters</div>", unsafe_allow_html=True)
     sel_store    = st.selectbox("Store", ["All"] + stores)
     sel_category = st.selectbox("Category", ["All"] + categories)
 
-    st.markdown("<hr style='border:none;height:1px;background:#ffffff22;margin:1rem 0'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border:none;height:1px;background:rgba(255,255,255,0.08);margin:1.2rem 0'>", unsafe_allow_html=True)
 
     model_label = "DEMO MODEL" if is_demo else "FULL MODEL"
     model_color = WARNING_COL if is_demo else SUCCESS
     st.markdown(f"""
-    <div style='font-size:0.7rem; color:{MIST}; letter-spacing:0.1em; text-transform:uppercase;'>Model Status</div>
-    <div style='font-family:Orbitron,monospace; font-size:0.85rem; color:{model_color};
-                font-weight:700; letter-spacing:0.08em; margin:0.3rem 0;'>● {model_label}</div>
-    <div style='font-size:0.68rem; color:{MIST}; line-height:1.5;'>{meta.get("model_name","—")}</div>
+    <div style='font-family:"Fraunces",serif; font-style:italic; font-size:0.92rem; color:{MIST};'>Model status</div>
+    <div style='font-family:Orbitron,monospace; font-size:0.95rem; color:{model_color};
+                font-weight:700; letter-spacing:0.06em; margin:0.4rem 0 0.3rem;'>● {model_label}</div>
+    <div style='font-family:"IBM Plex Mono",monospace; font-size:0.66rem; color:rgba(176,180,184,0.7) !important; line-height:1.55;'>{meta.get("model_name","—")}</div>
     """, unsafe_allow_html=True)
 
     if is_demo:
@@ -455,8 +732,13 @@ with st.sidebar:
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(f"""
-<div class='main-header'>Retail Demand Intelligence</div>
-<div class='sub-header'>Inventory Forecasting · CRISP-ML(Q) Pipeline · Oscar Ponce</div>
+<div class='issue-strip'>
+    <span><span class='dot'></span>LIVE · LAB 01 · INVENTORY</span>
+    <span>CRISP-ML(Q)</span>
+    <span>OSCAR PONCE · MMXXVI</span>
+</div>
+<div class='main-header'>Retail Demand <em>Intelligence</em></div>
+<div class='sub-header'>Inventory forecasting · 73,100 retail records · 5 stores · 20 products</div>
 """, unsafe_allow_html=True)
 
 # ─── KPI Strip ────────────────────────────────────────────────────────────────
@@ -570,15 +852,18 @@ with tab_sim:
 
         st.markdown(f"""
         <div class='prediction-box {box_class}'>
-            <div class='prediction-label'>Predicted Daily Demand</div>
+            <div class='pred-stamp'>CRISP · PRED v1</div>
+            <div class='prediction-label'>Predicted daily demand</div>
             <div class='prediction-value' style='color:{color};'>{pred_int}</div>
-            <div style='font-family:"IBM Plex Mono",monospace; font-size:0.72rem; margin-top:0.2rem; opacity:0.7;'>units · {category_in} · {store_in}</div>
-            <hr style='border:none;height:1px;background:{color}44;margin:0.7rem 0;'>
-            <div style='font-family:"IBM Plex Mono",monospace; font-size:0.8rem;'>
-                <b>Stock Status:</b> <span style='color:{color}; font-weight:700;'>{status}</span><br>
-                <b>Coverage:</b> {cov:.1f}x demand &nbsp;|&nbsp; <b>Inventory:</b> {inv_in} units
+            <div style='font-family:"IBM Plex Mono",monospace; font-size:0.68rem; margin-top:0.3rem; color:rgba(26,29,35,0.45); letter-spacing:0.12em; text-transform:uppercase;'>units · {category_in} · {store_in}</div>
+            <hr style='border:none;height:1px;background:rgba(26,29,35,0.12);margin:0.9rem 0 0.7rem;'>
+            <div style='font-family:"IBM Plex Mono",monospace; font-size:0.78rem; line-height:1.7;'>
+                <span style='font-family:"Fraunces",serif; font-style:italic; color:rgba(26,29,35,0.55);'>Stock status</span> &nbsp;
+                <span style='color:{color}; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; font-size:0.72rem;'>{status}</span><br>
+                <span style='font-family:"Fraunces",serif; font-style:italic; color:rgba(26,29,35,0.55);'>Coverage</span> {cov:.1f}× &nbsp;·&nbsp;
+                <span style='font-family:"Fraunces",serif; font-style:italic; color:rgba(26,29,35,0.55);'>Inventory</span> {inv_in} units
             </div>
-            {"<div class='prediction-advisory'>⚠ Recommended Reorder: <b>" + str(reorder) + " units</b></div>" if reorder > 0 else "<div class='prediction-advisory' style='color:" + SUCCESS + ";'>✓ No reorder needed</div>"}
+            {"<div class='prediction-advisory'>▸ Recommended reorder: <b>" + str(reorder) + " units</b></div>" if reorder > 0 else "<div class='prediction-advisory' style='border-left-color:" + SUCCESS + "; color:" + SUCCESS + ";'>✓ No reorder needed</div>"}
         </div>
         """, unsafe_allow_html=True)
 
@@ -608,6 +893,7 @@ with tab_sim:
             xaxis=dict(gridcolor=SILVER), yaxis=dict(gridcolor=SILVER),
         )
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown("<div class='fig-caption'><b>Fig. 01</b>Demand elasticity across a ±20% price band — vertical rule marks the current price.</div>", unsafe_allow_html=True)
 
         # Holiday vs. baseline
         row_no_hol  = {**row, "Holiday/Promotion": 0}
@@ -660,17 +946,18 @@ with tab_dash:
 
     fig3 = px.line(
         trend_weekly, x="Date", y="Units Sold", color="Category",
-        title="Weekly Average Demand by Category",
         color_discrete_sequence=[ESPRESSO_GOLD, INFO, SUCCESS, DANGER, PEBBLE],
     )
     fig3.update_layout(
         height=320, plot_bgcolor="white", paper_bgcolor="white",
         font_family="IBM Plex Mono",
-        title_font_family="Orbitron", title_font_size=13, title_font_color=GRAPHITE_DEEP,
-        xaxis=dict(gridcolor=SILVER), yaxis=dict(gridcolor=SILVER),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        xaxis=dict(gridcolor=SILVER, title=None),
+        yaxis=dict(gridcolor=SILVER, title="Units Sold"),
+        legend=dict(orientation="h", yanchor="top", y=-0.18, x=0.5, xanchor="center", font=dict(size=10)),
+        margin=dict(t=15, b=55, l=10, r=10),
     )
     st.plotly_chart(fig3, use_container_width=True)
+    st.markdown("<div class='fig-caption'><b>Fig. 02</b>Weekly-resampled mean demand by category, full two-year window.</div>", unsafe_allow_html=True)
 
     col_a, col_b = st.columns(2)
 
@@ -694,6 +981,7 @@ with tab_dash:
             margin=dict(t=40, b=10, l=10, r=10),
         )
         st.plotly_chart(fig4, use_container_width=True)
+        st.markdown("<div class='fig-caption'><b>Fig. 03</b>Mean units sold across seasonality × weather combinations.</div>", unsafe_allow_html=True)
 
     with col_b:
         st.markdown("<div class='section-header'>Inventory vs. Demand by Store</div>", unsafe_allow_html=True)
@@ -714,15 +1002,14 @@ with tab_dash:
         fig5.update_layout(
             barmode="group", height=300, plot_bgcolor="white", paper_bgcolor="white",
             font_family="IBM Plex Mono", bargap=0.35,
-            title=dict(text="Store-Level Comparison", font_family="Orbitron",
-                       font_size=12, font_color=GRAPHITE_DEEP, x=0.02, xanchor="left"),
-            xaxis=dict(gridcolor="rgba(0,0,0,0)"),
+            xaxis=dict(gridcolor="rgba(0,0,0,0)", title=None),
             yaxis=dict(gridcolor=SILVER),
-            legend=dict(orientation="h", yanchor="top", y=-0.15, x=0.5, xanchor="center",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, x=0.5, xanchor="center",
                         font=dict(size=10)),
-            margin=dict(t=40, b=55, l=10, r=10),
+            margin=dict(t=15, b=55, l=10, r=10),
         )
         st.plotly_chart(fig5, use_container_width=True)
+        st.markdown("<div class='fig-caption'><b>Fig. 04</b>Side-by-side store comparison — gold = demand, indigo = inventory.</div>", unsafe_allow_html=True)
 
     # Demand distribution
     st.markdown("<div class='section-header'>Demand Distribution</div>", unsafe_allow_html=True)
@@ -848,12 +1135,15 @@ with tab_reorder:
         )
         st.plotly_chart(fig8, use_container_width=True)
 
-# ─── Footer ───────────────────────────────────────────────────────────────────
+# ─── Colophon ─────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"""
-<div style='text-align:center; font-family:"IBM Plex Mono",monospace; font-size:0.7rem; color:{PEBBLE}; padding:0.5rem 0 1.5rem;'>
-    Built with CRISP-ML(Q) methodology ·
-    <a href='https://oscarponce.com' style='color:{ESPRESSO_GOLD}; text-decoration:none;'>oscarponce.com</a>
-    &nbsp;·&nbsp; 73,100 retail records · 5 stores · 20 products · 2 years
+<div style='display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:1rem;
+            font-family:"IBM Plex Mono",monospace; font-size:0.66rem;
+            color:rgba(26,29,35,0.45); letter-spacing:0.22em; text-transform:uppercase;
+            padding:0.8rem 0 1.8rem; border-top:1px solid rgba(26,29,35,0.12);'>
+    <span><span style='font-family:"Fraunces",serif; font-style:italic; text-transform:none; letter-spacing:0; font-size:0.85rem; color:rgba(26,29,35,0.7);'>Colophon</span>
+    &nbsp;·&nbsp; Built on CRISP-ML(Q) — six phases · time-aware splits · newsvendor P80</span>
+    <span><a href='https://oscarponce.com' style='color:{ESPRESSO_GOLD} !important; text-decoration:none; border-bottom:1px solid {ESPRESSO_GOLD};'>oscarponce.com</a> &nbsp;·&nbsp; MMXXVI</span>
 </div>
 """, unsafe_allow_html=True)
