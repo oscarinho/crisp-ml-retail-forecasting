@@ -1,0 +1,53 @@
+# ───── Python ─────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ───── Jupyter / notebook ─────
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+# Local model-fit cache (210 MB rf, etc.). Comments must be on their own line!
+checkpoints/
+notebooks/checkpoints/
+notebooks/__pycache__/
+
+# ───── Environments / IDE ─────
+.venv/
+venv/
+env/
+ENV/
+.env
+.envrc
+.idea/
+.vscode/
+*.swp
+
+# ───── OS / cruft ─────
+.DS_Store
+Thumbs.db
+*.log
+
+# ───── Streamlit ─────
+.streamlit/secrets.toml            # never commit secrets
+
+# ───── Project-specific ─────
+# QUESTIONS.md log can drift — keep clean for portfolio
+# (uncomment if you want to exclude it)
+# QUESTIONS.md
