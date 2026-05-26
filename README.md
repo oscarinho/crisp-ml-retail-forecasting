@@ -16,6 +16,8 @@ Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forec
 | Notebook | [`notebooks/Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb) | [`notebooks/Sales_Forecasting_CRISPML.ipynb`](notebooks/Sales_Forecasting_CRISPML.ipynb) |
 | Streamlit app | [`app/app.py`](app/app.py) | [`app/app_sales.py`](app/app_sales.py) |
 | Dataset | `data/retail_store_inventory.csv` (synthetic, memoryless) | `data/sales_data.csv` (autocorrelated, censored by stockouts) |
+| Rows × cols | 73,101 × 15 | 76,001 × 16 |
+| Date range | 2021-12-31 → 2023-12-31 | 2022-01-01 → 2024-01-29 |
 | Target | `Units Sold` | **`Demand`** (uncensored — `Units Sold ≤ Demand`) |
 | Leakage trap | `Demand Forecast` column (ρ ≈ 0.997) — drop | `Units Sold` column (ρ ≈ 0.83) — drop unlagged |
 | Within-group autocorr | ≈ 0 (no temporal memory) | ≈ 0.35 (modest but real) |
@@ -39,13 +41,65 @@ Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forec
 
 ---
 
+---
+
+## Datasets
+
+Both datasets are public, synthetic Kaggle retail-forecasting CSVs. They share the same schema
+family (5 stores × 20 products, same category & region taxonomies) but were generated under
+different assumptions — see the dataset MDs in [`data/`](data/) for the full provenance.
+
+### Inventory lab — `data/retail_store_inventory.csv`
+
+- **Source:** [Kaggle · "Retail Store Inventory Forecasting Dataset"](https://www.kaggle.com/datasets/anirudhchauhan/retail-store-inventory-forecasting-dataset) by Anirudh Singh Chauhan
+- **License:** CC0 (Public Domain)
+- **Shape:** 73,101 rows × 15 columns · 2021-12-31 → 2023-12-31
+- **Distinctive columns:** `Demand Forecast` (pre-computed signal, leakage with ρ ≈ 0.997 to
+  `Units Sold` — dropped during prep), `Holiday/Promotion` (single combined flag)
+- **Target:** `Units Sold` — censored by `Inventory Level` (stockouts cap observed sales)
+- **EDA quirk:** within-group autocorrelation ≈ 0 — the data is memoryless by construction,
+  which is why the headline MAE 69 is a *data ceiling*, not a modeling failure
+- **Sample columns:** Date, Store ID, Product ID, Category, Region, Inventory Level, Units Sold,
+  Units Ordered, Demand Forecast, Price, Discount, Weather Condition, Holiday/Promotion,
+  Competitor Pricing, Seasonality
+
+### Sales lab — `data/sales_data.csv`
+
+- **Source:** [Kaggle · "Retail Store Inventory and Demand Forecasting"](https://www.kaggle.com/datasets/atomicd/retail-store-inventory-and-demand-forecasting) by WAVELET
+- **License:** Apache-2.0
+- **Shape:** 76,001 rows × 16 columns · 2022-01-01 → 2024-01-29
+- **Mirror on Kaggle:** the same CSV is also republished by Ramin Huseyn as
+  [`demand_forecasting.csv` (CC0)](https://www.kaggle.com/datasets/raminhuseyn/demand-forecasting-dataset)
+  — byte-identical, just a different uploader / license. Either Kaggle page is a valid source.
+- **Distinctive columns:** `Promotion` and `Epidemic` as separate binary flags · explicit `Demand`
+  target (uncensored — `Units Sold ≤ Demand`, so this dataset preserves lost demand from
+  stockouts), wider numeric ranges (Inventory up to 2,267 vs the inventory CSV's ~500, Price up
+  to 228 vs ~100)
+- **Target:** `Demand` — what customers wanted, not just what they got
+- **EDA quirk:** within-group autocorrelation ≈ 0.35 — modest but exploitable, which is what
+  unlocks the per-category LightGBM win (MAE 19.5)
+
+### Compare at a glance
+
+|  | Inventory CSV | Sales CSV |
+|---|---|---|
+| Promotion flag | combined `Holiday/Promotion` | separate `Promotion` |
+| Epidemic flag | — | `Epidemic` ∈ {0, 1} |
+| Demand signal | leaky `Demand Forecast` (drop) | clean `Demand` (target) |
+| Stockout treatment | sales censored to inventory | demand recorded uncensored |
+| Use it for | inventory coverage / reorder | demand under promo / epidemic / pricing |
+
+---
+
 ## Repository structure
 
 ```
 forecasting-inventory/
 ├── data/
 │   ├── retail_store_inventory.csv   # Inventory lab dataset (~6 MB)
-│   └── sales_data.csv                # Sales lab dataset (~6 MB)
+│   ├── retail_store_inventory.md    # Inventory dataset card (Kaggle attribution)
+│   ├── sales_data.csv               # Sales lab dataset (~6 MB)
+│   └── sales_data.md                # Sales dataset card (WAVELET / Apache-2.0)
 ├── notebooks/
 │   ├── Inventory_Forecasting_CRISPML.ipynb
 │   ├── Sales_Forecasting_CRISPML.ipynb
@@ -131,4 +185,6 @@ See [`CLAUDE.md`](CLAUDE.md) for the project conventions used while building thi
 
 ## License & attribution
 
-Datasets are public Kaggle retail-forecasting datasets (synthetic). Code is provided as-is for portfolio purposes.
+Datasets are public, synthetic Kaggle retail-forecasting datasets — see the [Datasets section](#datasets)
+above for per-CSV attribution, Kaggle URLs, and licenses (CC0 / Apache-2.0). Code is provided
+as-is for portfolio purposes.
