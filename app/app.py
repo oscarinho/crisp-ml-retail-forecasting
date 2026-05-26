@@ -205,23 +205,36 @@ hr {{
 }}
 
 .stTabs [data-baseweb="tab-list"] {{
-    gap: 4px;
-    background: {GRAPHITE}10;
-    border-radius: 8px;
-    padding: 4px;
+    gap: 6px;
+    background: rgba(42, 48, 56, 0.04);
+    border-radius: 10px;
+    padding: 6px;
+    border-bottom: 1px solid {SILVER};
+}}
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{
+    background: transparent !important;
+    height: 0 !important;
 }}
 .stTabs [data-baseweb="tab"] {{
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.78rem;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    border-radius: 6px;
-    color: {PEBBLE};
+    border-radius: 7px;
+    color: {SLATE};
+    padding: 0.55rem 1.4rem;
+    transition: all 0.15s ease;
+    background: transparent;
+}}
+.stTabs [data-baseweb="tab"]:hover {{
+    background: rgba(201, 168, 106, 0.12);
+    color: {GRAPHITE};
 }}
 .stTabs [aria-selected="true"] {{
-    background: {ESPRESSO_GOLD} !important;
-    color: {GRAPHITE} !important;
-    font-weight: 600;
+    background: linear-gradient(135deg, {ESPRESSO_GOLD} 0%, #B89858 100%) !important;
+    color: {GRAPHITE_DEEP} !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(36, 3, 56, 0.18);
 }}
 
 [data-testid="stButton"] > button {{
@@ -696,17 +709,18 @@ with tab_dash:
         ))
         fig5.add_trace(go.Bar(
             name="Avg Inventory", x=store_agg["Store ID"], y=store_agg["Inventory"],
-            marker_color=INFO + "88",
+            marker_color="rgba(74, 103, 176, 0.53)",
         ))
         fig5.update_layout(
-            barmode="group", height=270, plot_bgcolor="white", paper_bgcolor="white",
-            font_family="IBM Plex Mono",
+            barmode="group", height=300, plot_bgcolor="white", paper_bgcolor="white",
+            font_family="IBM Plex Mono", bargap=0.35,
             title=dict(text="Store-Level Comparison", font_family="Orbitron",
-                       font_size=12, font_color=GRAPHITE_DEEP),
+                       font_size=12, font_color=GRAPHITE_DEEP, x=0.02, xanchor="left"),
             xaxis=dict(gridcolor="rgba(0,0,0,0)"),
             yaxis=dict(gridcolor=SILVER),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-            margin=dict(t=40, b=10),
+            legend=dict(orientation="h", yanchor="top", y=-0.15, x=0.5, xanchor="center",
+                        font=dict(size=10)),
+            margin=dict(t=40, b=55, l=10, r=10),
         )
         st.plotly_chart(fig5, use_container_width=True)
 
