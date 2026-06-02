@@ -1,0 +1,66 @@
+[
+  {
+    "name": "Baseline: per-group mean",
+    "mae": 146.308,
+    "rmse": 525.058,
+    "mape": 47.82,
+    "rmsle": 0.686,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Baseline: naive lag-7",
+    "mae": 85.016,
+    "rmse": 310.951,
+    "mape": 47.31,
+    "rmsle": 0.54482,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Baseline: naive rolling-28",
+    "mae": 98.513,
+    "rmse": 328.824,
+    "mape": 44.49,
+    "rmsle": 0.45808,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Stage 2: LightGBM",
+    "mae": 53.194,
+    "rmse": 180.82,
+    "mape": 39.75,
+    "rmsle": 0.51607,
+    "fit_sec": 40.0
+  },
+  {
+    "name": "Stage 2: HistGradientBoosting",
+    "mae": 54.06,
+    "rmse": 182.275,
+    "mape": 39.54,
+    "rmsle": 0.52635,
+    "fit_sec": 122.6
+  },
+  {
+    "name": "Stage 2: CatBoost",
+    "mae": 62.992,
+    "rmse": 215.932,
+    "mape": 35.41,
+    "rmsle": 0.39978,
+    "fit_sec": 124.1
+  },
+  {
+    "name": "Stage 1: LightGBM (no lags)",
+    "mae": 67.316,
+    "rmse": 210.708,
+    "mape": 98.64,
+    "rmsle": 1.00449,
+    "fit_sec": 28.4
+  },
+  {
+    "name": "Per-family LightGBM (routed)",
+    "mae": 52.041,
+    "rmse": 185.918,
+    "mape": 34.61,
+    "rmsle": 0.39352,
+    "fit_sec": 192.5
+  }
+]

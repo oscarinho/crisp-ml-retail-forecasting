@@ -1,6 +1,6 @@
 # CRISP-ML(Q) Retail Demand Forecasting
 
-Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forecasting on two contrasting datasets. End-to-end: business understanding → leakage audits → time-aware feature engineering → model bake-off → P80 quantile newsvendor → deployment.
+**Four labs** applying the **CRISP-ML(Q)** methodology to retail demand forecasting across contrasting datasets. End-to-end: business understanding → leakage audits → time-aware feature engineering → Tier 1/2 model bake-off → per-category routing → champion-challenger backtesting → deployment.
 
 **Author:** [Oscar Ponce](https://oscarponce.com)
 **Live demos:**
@@ -9,21 +9,24 @@ Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forec
 
 ---
 
-## The two labs
+## The four labs
 
-| | **Inventory lab** | **Sales lab** |
-|---|---|---|
-| Notebook | [`notebooks/Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb) | [`notebooks/Sales_Forecasting_CRISPML.ipynb`](notebooks/Sales_Forecasting_CRISPML.ipynb) |
-| Streamlit app | [`app/app.py`](app/app.py) | [`app/app_sales.py`](app/app_sales.py) |
-| Dataset | `data/retail_store_inventory.csv` (synthetic, memoryless) | `data/sales_data.csv` (autocorrelated, censored by stockouts) |
-| Rows × cols | 73,101 × 15 | 76,001 × 16 |
-| Date range | 2021-12-31 → 2023-12-31 | 2022-01-01 → 2024-01-29 |
-| Target | `Units Sold` | **`Demand`** (uncensored — `Units Sold ≤ Demand`) |
-| Leakage trap | `Demand Forecast` column (ρ ≈ 0.997) — drop | `Units Sold` column (ρ ≈ 0.83) — drop unlagged |
-| Within-group autocorr | ≈ 0 (no temporal memory) | ≈ 0.35 (modest but real) |
-| Best holdout MAE — no DF | **69** (data ceiling) | **19.5** (per-category routing) |
-| Best holdout MAE — DF as prior | **7.4** (residual: DF + HGB) | n/a (no DF column in Sales) |
-| Best model | Stacking ensemble (no-DF) · HGB residual (DF-prior) | Per-category LightGBM (5 dedicated models) |
+| | **Inventory** | **Sales** | **Food Demand** | **Store Sales** |
+|---|---|---|---|---|
+| Notebook | [`Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb) | [`Sales_Forecasting_CRISPML.ipynb`](notebooks/Sales_Forecasting_CRISPML.ipynb) | [`Food_Demand_Forecasting_CRISPML.ipynb`](notebooks/Food_Demand_Forecasting_CRISPML.ipynb) | [`Store_Sales_Forecasting_CRISPML.ipynb`](notebooks/Store_Sales_Forecasting_CRISPML.ipynb) |
+| Streamlit app | [`app/app.py`](app/app.py) | [`app/app_sales.py`](app/app_sales.py) | — (TODO) | — (TODO) |
+| Dataset | `data/retail_store_inventory.csv` (synthetic) | `data/sales_data.csv` (synthetic) | `data/food_demand/` (Genpact / Analytics Vidhya) | `data/store-sales-time-series-forecasting/` (Kaggle / Corporación Favorita) |
+| Rows | 73k | 76k | **457k** | **3,000k** |
+| Grain | daily | daily | weekly | daily |
+| Series | 100 (5 store × 20 prod) | 100 | 3,927 (77 ctr × 51 meals) | 1,782 (54 store × 33 fam) |
+| Date range | 2021-12 → 2023-12 | 2022-01 → 2024-01 | 145 weeks | 2013-01 → 2017-08 |
+| Target | `Units Sold` | `Demand` (uncensored) | `num_orders` | `sales` |
+| Leakage trap | `Demand Forecast` (ρ≈0.997) | `Units Sold` (ρ≈0.83 unlagged) | none | none |
+| Within-group autocorr | ≈ 0 | ≈ 0.35 | ≈ 0.5 | ≈ 0.6-0.8 |
+| Best holdout MAE — no DF | **69** (data ceiling) | **19.5** | **68.6** (ExtraTrees) | **52.0** (per-family LGBM) |
+| Best holdout MAE — DF as prior | **7.4** (residual: DF + HGB) | n/a | n/a | n/a |
+| Best Kaggle-style metric | n/a | n/a | **RMSLE×100 = 49.1** (CatBoost) | **RMSLE = 0.394** (per-family LGBM) |
+| Best model | Stacking ensemble (no-DF) · HGB residual (DF-prior) | Per-category LightGBM (5) | LightGBM Stage 2 (deployable winner) · CatBoost on RMSLE | **Per-family LightGBM (33)** |
 
 ---
 
@@ -41,6 +44,21 @@ Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forec
 - **Early stopping does not rescue lag features** — best iteration 628 vs default 600; the model wanted more trees, not fewer. The overfit is structural, not a budget problem.
 - **Log-transform target doesn't help here** — heteroscedasticity ratio 1.47 was misleading; tested and confirmed (MAE went up 0.2 units).
 - **Per-category routing wins** (MAE 19.5, −3.2% vs global): the gains come from Clothing (−9.5%) and Electronics (−9.2%), *not* Groceries (which was the worst-performing category but barely improved at −0.7%).
+
+### Food Demand lab
+- **CatBoost wins on RMSLE×100=49.1** — driven by native categorical handling (cuisine, category, center_type, city_code, region_code all have ≥10 levels)
+- **ExtraTrees wins on MAE=68.6** — strong on this tabular structure with high-cardinality cats
+- **Per-cuisine routing does NOT win here** (MAE 72.3 vs LightGBM 69.7) — opposite of the Sales lab. Only 4 cuisines and some have very few meals → per-cuisine models overfit
+- Stage 1 (no lags) MAE 92.8 vs Stage 2 with lags MAE 69.7 → **lags add ~25% lift** (autocorr ≈ 0.5 was real)
+- Naive baselines bottom out at MAE 100 — Stage 2 cuts that by 30%, CatBoost cuts RMSLE by 25%
+
+### Store Sales lab (Corporación Favorita / Kaggle)
+- 3M rows, 4.5 years, 1,782 series (54 stores × 33 families)
+- External regressors merged: oil price (ffill weekends), daily transactions per store, holiday flags
+- **Per-family LightGBM wins** (RMSLE 0.394, MAE 52.04) — confirms the Sales lab pattern scales to 3M rows × 33 families
+- CatBoost second on RMSLE (0.400), competitive on accuracy but 3× slower
+- Stage 1 (no lags) RMSLE 1.005 vs Stage 2 RMSLE 0.516 → **lags carry 50% of the signal** (autocorr ≈ 0.6-0.8 was real)
+- Naive lag-7 baseline RMSLE 0.545 — surprisingly close to Stage 2 LGBM single-model (0.516); the per-family routing is what unlocks the next 30% gain
 
 ---
 
@@ -99,27 +117,29 @@ different assumptions — see the dataset MDs in [`data/`](data/) for the full p
 ```
 forecasting-inventory/
 ├── data/
-│   ├── retail_store_inventory.csv   # Inventory lab dataset (~6 MB)
-│   ├── retail_store_inventory.md    # Inventory dataset card (Kaggle attribution)
-│   ├── sales_data.csv               # Sales lab dataset (~6 MB)
-│   └── sales_data.md                # Sales dataset card (WAVELET / Apache-2.0)
+│   ├── retail_store_inventory.csv         # Inventory lab dataset (~6 MB)
+│   ├── retail_store_inventory.md          # Inventory dataset card (Kaggle attribution)
+│   ├── sales_data.csv                     # Sales lab dataset (~6 MB)
+│   ├── sales_data.md                      # Sales dataset card (WAVELET / Apache-2.0)
+│   ├── food_demand/                       # Genpact food demand challenge (3 CSVs)
+│   └── store-sales-time-series-forecasting/  # Kaggle Corporación Favorita (6 CSVs)
 ├── notebooks/
 │   ├── Inventory_Forecasting_CRISPML.ipynb
 │   ├── Sales_Forecasting_CRISPML.ipynb
-│   └── notebook_utils.py             # cached() helper for disk checkpointing
+│   ├── Food_Demand_Forecasting_CRISPML.ipynb       # Lab 3 — weekly food demand
+│   ├── Store_Sales_Forecasting_CRISPML.ipynb       # Lab 4 — Kaggle daily grocery
+│   └── notebook_utils.py                  # cached() helper for disk checkpointing
 ├── model/
-│   ├── model.pkl                     # Inventory: Stage 2 LightGBM (full features)
-│   ├── model_contextual.pkl          # Inventory: app-aligned (no lags)
-│   ├── model_stage1.pkl              # Inventory: cold-start
-│   ├── model_q80.pkl                 # Inventory: P80 quantile
+│   ├── model.pkl                          # Inventory: Stage 2 LightGBM (full features)
+│   ├── model_contextual.pkl               # Inventory: app-aligned (no lags)
+│   ├── model_stage1.pkl                   # Inventory: cold-start
+│   ├── model_q80.pkl                      # Inventory: P80 quantile
 │   ├── model_metadata.pkl
-│   └── sales/
-│       ├── model.pkl                 # Sales: Stage 2 LightGBM
-│       ├── model_contextual.pkl      # Sales: app-aligned (fallback)
-│       ├── model_stage1.pkl          # Sales: cold-start
-│       ├── model_per_category.pkl    # Sales: per-category dict (5 models) ← winner
-│       ├── model_q80.pkl             # Sales: P80 quantile
-│       └── model_metadata.pkl
+│   ├── sales/                             # Sales lab artifacts (5 pkls)
+│   ├── food_demand/                       # Food Demand lab artifacts
+│   │   ├── best_model.pkl                 # CatBoost (RMSLE winner)
+│   │   └── model_metadata.pkl
+│   └── store_sales/                       # Store Sales lab artifacts
 ├── app/
 │   ├── app.py                        # Inventory Streamlit app
 │   └── app_sales.py                  # Sales Streamlit app
@@ -129,10 +149,15 @@ forecasting-inventory/
 ├── EXPERIMENT_DF_RESIDUAL.md         # Two-ceiling analysis (Residual + Champion-Challenger)
 ├── TEST_CASES.md                     # QA scenarios with exact expected predictions
 ├── scripts/
-│   ├── add_tier12_cells.py           # Idempotent notebook-cell upserter
-│   ├── df_experiments.py             # Residual + Champion-Challenger backtests
-│   ├── df_experiments_results.json   # Cached experiment outputs
-│   └── gen_test_cases.py             # Regenerates TEST_CASES.md predictions
+│   ├── add_tier12_cells.py           # Idempotent Tier-1/2 + residual cell upserter
+│   ├── df_experiments.py             # Residual + Champion-Challenger backtests (Inventory)
+│   ├── df_experiments_results.json   # Cached experiment outputs (Inventory)
+│   ├── gen_test_cases.py             # Regenerates TEST_CASES.md predictions
+│   ├── generate_new_notebooks.py     # Produces Food + Store Sales notebooks
+│   ├── run_food_demand.py            # Batch experiment runner for Food Demand
+│   ├── food_demand_results.json      # Cached Food Demand results
+│   ├── run_store_sales.py            # Batch experiment runner for Store Sales
+│   └── store_sales_results.json      # Cached Store Sales results
 └── requirements.txt
 ```
 

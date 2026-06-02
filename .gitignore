@@ -51,3 +51,13 @@ Thumbs.db
 # QUESTIONS.md log can drift — keep clean for portfolio
 # (uncomment if you want to exclude it)
 # QUESTIONS.md
+
+# CatBoost auto-generated training logs
+catboost_info/
+notebooks/catboost_info/
+
+# Vic's external comparison material (856 MB pickle inside, kept locally only)
+CRISP-ML-vic/
+
+# Store-Sales raw train.csv exceeds GitHub 100MB file limit — see data card for download
+data/store-sales-time-series-forecasting/train.csv

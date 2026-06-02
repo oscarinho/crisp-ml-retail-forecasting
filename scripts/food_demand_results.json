@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Baseline: per-group mean",
+    "mae": 106.95,
+    "rmse": 241.312,
+    "mape": 81.05,
+    "rmsle_100": 68.368,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Baseline: naive lag-1",
+    "mae": 99.856,
+    "rmse": 260.985,
+    "mape": 66.6,
+    "rmsle_100": 70.224,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Baseline: naive rolling-5",
+    "mae": 101.333,
+    "rmse": 261.431,
+    "mape": 71.02,
+    "rmsle_100": 65.468,
+    "fit_sec": 0.0
+  },
+  {
+    "name": "Stage 2: LightGBM",
+    "mae": 69.68,
+    "rmse": 150.849,
+    "mape": 52.16,
+    "rmsle_100": 52.822,
+    "fit_sec": 11.3
+  },
+  {
+    "name": "Stage 2: HistGradientBoosting",
+    "mae": 70.189,
+    "rmse": 151.09,
+    "mape": 52.09,
+    "rmsle_100": 52.988,
+    "fit_sec": 46.7
+  },
+  {
+    "name": "Stage 2: RandomForest",
+    "mae": 69.574,
+    "rmse": 156.889,
+    "mape": 53.11,
+    "rmsle_100": 51.428,
+    "fit_sec": 118.4
+  },
+  {
+    "name": "Stage 2: ExtraTrees",
+    "mae": 68.603,
+    "rmse": 148.951,
+    "mape": 52.68,
+    "rmsle_100": 50.943,
+    "fit_sec": 89.5
+  },
+  {
+    "name": "Stage 2: CatBoost",
+    "mae": 69.436,
+    "rmse": 165.07,
+    "mape": 45.69,
+    "rmsle_100": 49.11,
+    "fit_sec": 15.5
+  },
+  {
+    "name": "Stage 1: LightGBM (no lags)",
+    "mae": 92.814,
+    "rmse": 187.124,
+    "mape": 69.41,
+    "rmsle_100": 70.939,
+    "fit_sec": 10.0
+  },
+  {
+    "name": "Per-cuisine LightGBM (routed)",
+    "mae": 72.299,
+    "rmse": 156.772,
+    "mape": 50.37,
+    "rmsle_100": 53.703,
+    "fit_sec": 35.0
+  }
+]
