@@ -21,17 +21,20 @@ Two sibling labs applying the **CRISP-ML(Q)** methodology to retail demand forec
 | Target | `Units Sold` | **`Demand`** (uncensored — `Units Sold ≤ Demand`) |
 | Leakage trap | `Demand Forecast` column (ρ ≈ 0.997) — drop | `Units Sold` column (ρ ≈ 0.83) — drop unlagged |
 | Within-group autocorr | ≈ 0 (no temporal memory) | ≈ 0.35 (modest but real) |
-| Best holdout MAE | **69** (data ceiling; oracle MAE 8) | **19.5** (per-category routing) |
-| Best model | Stacking ensemble | Per-category LightGBM (5 dedicated models) |
+| Best holdout MAE — no DF | **69** (data ceiling) | **19.5** (per-category routing) |
+| Best holdout MAE — DF as prior | **7.4** (residual: DF + HGB) | n/a (no DF column in Sales) |
+| Best model | Stacking ensemble (no-DF) · HGB residual (DF-prior) | Per-category LightGBM (5 dedicated models) |
 
 ---
 
 ## Headline findings
 
 ### Inventory lab
-- The dataset has zero within-group autocorrelation. Stacking, LSTM, Prophet, ARIMA, ETS all converge to MAE ~69. **MAE 69 is the noise ceiling, not a modeling failure.**
-- The `Demand Forecast` column at ρ 0.997 is leakage (would not exist on real forecast day) — dropping it is the correct call.
+- The dataset has zero within-group autocorrelation. Stacking, LSTM, Prophet, ARIMA, ETS, CatBoost, HGB, NHITS, TFT all converge to MAE ~69. **MAE 69 is the *no-DF* noise ceiling, not a modeling failure.**
+- **Two ceilings, not one.** A residual-learning experiment (§4.13 / [`EXPERIMENT_DF_RESIDUAL.md`](EXPERIMENT_DF_RESIDUAL.md)) shows that *if* `Demand Forecast` is available at inference time (which it is in real planning systems), the deployable ceiling is **MAE ≈ 7.4** via `pred = DF + HGB(features)`. The 62-unit gap between the two ceilings is **environmental, not modeling skill**.
+- `Demand Forecast` at ρ 0.997 is a leakage trap when used as a direct feature, but **legitimate as a prior** in a residual-learning frame.
 - Stage 1 (contextual only) gets MAE 90; Stage 2 with lags gets MAE 69. Cold-start routing: ≥28 days history → Stage 2, otherwise Stage 1.
+- 18-window champion-challenger backtest (§4.14): HGB_residual wins 17/18 windows. **Framing > model choice** — Direct vs Residual changes MAE by 62 units; choice of algorithm (HGB/RF/LGBM) changes MAE by ~0.04.
 
 ### Sales lab
 - **More features hurt**: App-aligned (15 features, no lags) MAE 20.13 beats Stage 2 (29 features incl. lags) MAE 21.09. Confirmed via train-vs-holdout gap (22.7% vs 14.5%).
@@ -123,6 +126,13 @@ forecasting-inventory/
 ├── examples/                         # Reference notebooks (not run; read-only)
 ├── CLAUDE.md                         # Project-specific dev instructions
 ├── LINKEDIN_POSTS.md                 # 10-post content plan
+├── EXPERIMENT_DF_RESIDUAL.md         # Two-ceiling analysis (Residual + Champion-Challenger)
+├── TEST_CASES.md                     # QA scenarios with exact expected predictions
+├── scripts/
+│   ├── add_tier12_cells.py           # Idempotent notebook-cell upserter
+│   ├── df_experiments.py             # Residual + Champion-Challenger backtests
+│   ├── df_experiments_results.json   # Cached experiment outputs
+│   └── gen_test_cases.py             # Regenerates TEST_CASES.md predictions
 └── requirements.txt
 ```
 

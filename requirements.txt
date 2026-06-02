@@ -15,3 +15,6 @@ prophet>=1.1     # optional — Challenge 1 classical baseline
 torch>=2.0       # optional — Challenge 1 LSTM baseline (multivariate)
 shap>=0.45       # optional — Phase 5 feature attribution
 pmdarima>=2.0    # optional — auto_arima per-group order selection
+catboost>=1.2          # optional — Tier 1 native-categorical GBM benchmark
+statsforecast>=1.7     # optional — Tier 1 AutoTheta / M-comp classical baselines
+neuralforecast>=1.7    # optional — Tier 2 modern DL forecasters (NBEATS, NHITS, DLinear, DeepAR, TFT)
