@@ -354,8 +354,9 @@ except ImportError:
     print('catboost not installed — skip. pip install catboost')
 
 if _HAS_CATBOOST:
-    CB_CAT_COLS = [c for c in ['Category', 'Region', 'Weather Condition', 'Seasonality']
-                   if c in S2_FEATURES]
+    # Use S2_CAT directly — it includes Store ID which CatBoost must know is categorical
+    # (otherwise it tries to convert 'S001' to float and crashes).
+    CB_CAT_COLS = [c for c in S2_CAT if c in S2_FEATURES]
 
     def fit_catboost():
         Xtr = X_train_s2.copy(); Xte = X_test_s2.copy()

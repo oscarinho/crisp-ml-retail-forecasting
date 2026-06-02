@@ -1119,9 +1119,332 @@ def build_notebook(cells: list[dict], path: Path) -> None:
     print(f"Wrote {path.name}  ({len(cells)} cells)")
 
 
+# ============================================================================
+# COLAB notebook — runs all 4 labs end-to-end on a single Run All
+# ============================================================================
+
+def cells_colab_all_labs() -> list[dict]:
+    return [
+        md("""# 🚀 CRISP-ML(Q) Retail Forecasting — Colab Run All
+
+End-to-end execution of all four labs in this portfolio, designed for **`Runtime > Run all`** on Google Colab.
+
+| Lab | Dataset | Series | Best Model (expected) | Compute |
+|---|---|---|---|---|
+| 1. Inventory | 73k synthetic rows | 100 | HGB residual (DF as prior) — MAE 7.4 | ~3 min |
+| 2. Sales | 76k synthetic rows | 100 | Per-category LightGBM (5 models) — MAE 19.5 | ~5 min |
+| 3. Food Demand | 457k Genpact weekly | 3,927 | CatBoost — RMSLE×100 = 49 | ~10 min |
+| 4. Store Sales | 3M Kaggle daily | 1,782 | Per-family LightGBM (33 models) — RMSLE 0.39 | ~15 min |
+
+**Setup:** the first cell clones the repo and installs deps. Lab 4 needs the Kaggle `train.csv` (116 MB) which isn't in the repo — upload your `kaggle.json` when prompted or skip the Lab 4 cells.
+
+> ⚠ Use **Runtime > Change runtime type > High-RAM** (Colab Pro). The free tier's 12 GB will OOM during the 3M-row Store Sales lab. TPUs do NOT help here — tabular ML runs on CPU.
+"""),
+
+        md("## Step 1 — Setup (clone repo, install deps)"),
+
+        code("""# Clone the public repo (skip if you uploaded it via Drive instead)
+import os
+if not os.path.exists('crisp-ml-retail-forecasting'):
+    !git clone -q https://github.com/oscarinho/crisp-ml-retail-forecasting.git
+%cd /content/crisp-ml-retail-forecasting
+
+# System libs for LightGBM (Linux libomp)
+!apt-get install -y libgomp1 > /dev/null 2>&1
+
+# Python deps — anything not in Colab's default
+!pip install -q lightgbm catboost statsforecast neuralforecast pmdarima joblib
+
+# Sanity check
+import importlib
+for m in ['pandas','numpy','sklearn','lightgbm','catboost','statsforecast','joblib']:
+    v = getattr(importlib.import_module(m), '__version__', '?')
+    print(f'  {m:18s} v{v}')
+print('\\n✓ Setup complete')
+"""),
+
+        md("""## Step 2 — (Optional) Download Store Sales train.csv from Kaggle
+
+Skip this cell if you only want labs 1-3. The 116 MB train.csv is gitignored — needs Kaggle credentials.
+
+To get your `kaggle.json`: kaggle.com → Settings → Account → Create New API Token.
+"""),
+
+        code("""import os
+if not os.path.exists('data/store-sales-time-series-forecasting/train.csv'):
+    print('Store Sales train.csv missing — upload kaggle.json to enable Lab 4')
+    print('(or run `raise SystemExit` in next cell to stop after Lab 3)')
+    try:
+        from google.colab import files
+        uploaded = files.upload()  # prompt for kaggle.json
+        !mkdir -p ~/.kaggle && cp kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
+        !kaggle competitions download -c store-sales-time-series-forecasting -p data/store-sales-time-series-forecasting -q
+        !cd data/store-sales-time-series-forecasting && unzip -q -o store-sales-time-series-forecasting.zip
+        print('\\n✓ Store Sales data ready')
+    except Exception as e:
+        print(f'Skipped: {e}')
+else:
+    print('✓ Store Sales train.csv already present')
+"""),
+
+        md("""---
+# 🧪 Lab 1 — Inventory Forecasting
+
+Synthetic retail (73k rows). The dataset includes a `Demand Forecast` column with ρ=0.997 to `Units Sold` — a leakage trap when used directly, but a **legitimate prior under residual learning**.
+
+This cell runs both flagship experiments:
+- **Experiment A:** Residual learning (`pred = DF + model.predict(features)`) vs DF puro vs direct model
+- **Experiment B:** 18-window rolling champion-challenger backtest across 7 contenders
+
+Output: every model's MAE + champion-challenger win counts.
+"""),
+
+        code("""!python scripts/df_experiments.py"""),
+
+        code("""import json, pandas as pd
+from IPython.display import display, Markdown
+
+results = json.loads(open('scripts/df_experiments_results.json').read())
+
+display(Markdown('### Experiment A — Residual Learning (90-day holdout)'))
+exp_a = pd.DataFrame(results['experiment_a'])
+display(exp_a[['name','mae','rmse','bias']].rename(columns=str.title))
+
+display(Markdown('### Experiment B — Champion-Challenger (18 rolling windows)'))
+wins = results['experiment_b_win_counts']
+summary = pd.DataFrame(results['experiment_b_summary']).sort_values('mean')
+summary['wins'] = summary['model'].map(wins).fillna(0).astype(int)
+display(summary[['model','wins','mean','std','min','max']].rename(
+    columns={'mean':'MAE_mean','std':'MAE_std','min':'MAE_min','max':'MAE_max'}))
+"""),
+
+        md("""---
+# 🧪 Lab 2 — Sales Forecasting
+
+Sibling synthetic dataset (76k rows) with `Promotion` + `Epidemic` flags. The Sales-lab winner is **per-category LightGBM** (5 dedicated models). This pattern generalizes to Lab 3/4 with different scales.
+"""),
+
+        code("""# Lab 2 — condensed pipeline (skip the full CRISP-ML phases, run the winner directly)
+import time, warnings; warnings.filterwarnings('ignore')
+import numpy as np, pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder
+from lightgbm import LGBMRegressor
+
+df = pd.read_csv('data/sales_data.csv', parse_dates=['Date'])
+df = df.sort_values(['Store ID','Product ID','Date']).reset_index(drop=True)
+
+# Minimal features (the "app-aligned" winner from the lab — 15 features, no lags)
+df['day_of_week'] = df['Date'].dt.dayofweek
+df['month']       = df['Date'].dt.month
+df['is_weekend']  = df['day_of_week'].isin([5,6]).astype(int)
+df['sin_year']    = np.sin(2*np.pi*df['Date'].dt.dayofyear/365.25)
+df['cos_year']    = np.cos(2*np.pi*df['Date'].dt.dayofyear/365.25)
+
+FEATURES = ['Category','Region','Weather Condition','Seasonality',
+            'Inventory Level','Price','Discount','Competitor Pricing',
+            'Promotion','Epidemic',
+            'day_of_week','month','is_weekend','sin_year','cos_year']
+NUM = ['Inventory Level','Price','Discount','Competitor Pricing','Promotion','Epidemic',
+       'day_of_week','month','is_weekend','sin_year','cos_year']
+CAT = ['Category','Region','Weather Condition','Seasonality']
+
+def make_pre():
+    return ColumnTransformer([
+        ('num', SimpleImputer(strategy='median'), NUM),
+        ('cat', Pipeline([('imp', SimpleImputer(strategy='most_frequent')),
+                          ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))]), CAT),
+    ])
+
+# Time split
+SPLIT = df['Date'].max() - pd.Timedelta(days=90)
+train = df[df['Date'] <= SPLIT].reset_index(drop=True)
+test  = df[df['Date'] >  SPLIT].reset_index(drop=True)
+
+results_sales = []
+
+# Per-category routing (the winner)
+t0 = time.time()
+per_cat = {}; preds = np.zeros(len(test))
+for cat, tr_g in train.groupby('Category'):
+    p = Pipeline([('pre', make_pre()),
+                  ('m', LGBMRegressor(n_estimators=400, learning_rate=0.05, num_leaves=63,
+                                      random_state=42, n_jobs=-1, verbose=-1))])
+    p.fit(tr_g[FEATURES], tr_g['Demand'])
+    te_g = test[test['Category']==cat]
+    if len(te_g):
+        preds[te_g.index] = np.clip(p.predict(te_g[FEATURES]), 0, None)
+    per_cat[cat] = p
+mae = mean_absolute_error(test['Demand'], preds)
+rmse = float(np.sqrt(mean_squared_error(test['Demand'], preds)))
+results_sales.append({'Model': 'Per-category LightGBM (5 routed)', 'MAE': round(mae,2), 'RMSE': round(rmse,2), 'Fit sec': round(time.time()-t0,1)})
+
+# Global LightGBM baseline
+t0 = time.time()
+p = Pipeline([('pre', make_pre()),
+              ('m', LGBMRegressor(n_estimators=600, learning_rate=0.05, num_leaves=63,
+                                  random_state=42, n_jobs=-1, verbose=-1))])
+p.fit(train[FEATURES], train['Demand'])
+pred_g = np.clip(p.predict(test[FEATURES]), 0, None)
+mae = mean_absolute_error(test['Demand'], pred_g)
+rmse = float(np.sqrt(mean_squared_error(test['Demand'], pred_g)))
+results_sales.append({'Model': 'Global LightGBM', 'MAE': round(mae,2), 'RMSE': round(rmse,2), 'Fit sec': round(time.time()-t0,1)})
+
+# Naive lag-1 baseline
+naive = test.sort_values(['Store ID','Product ID','Date']).groupby(['Store ID','Product ID'])['Demand'].shift(1).fillna(train['Demand'].mean())
+results_sales.append({'Model': 'Baseline: naive lag-1', 'MAE': round(mean_absolute_error(test['Demand'], naive),2),
+                      'RMSE': round(float(np.sqrt(mean_squared_error(test['Demand'], naive))),2), 'Fit sec': 0})
+
+pd.DataFrame(results_sales).sort_values('MAE').reset_index(drop=True)
+"""),
+
+        md("""---
+# 🧪 Lab 3 — Food Demand (Genpact / Analytics Vidhya)
+
+457k weekly rows across 77 fulfilment centers × 51 meals × 4 cuisines. **Real, non-synthetic** retail data. Strong within-group autocorrelation (≈ 0.5) — lags genuinely help.
+
+Per-cuisine routing surprisingly does NOT win here — only 4 cuisines means each sub-model overfits. **LightGBM Stage 2 is the deployable winner.**
+"""),
+
+        code("""!python scripts/run_food_demand.py"""),
+
+        code("""import json, pandas as pd
+results = json.loads(open('scripts/food_demand_results.json').read())
+lb = pd.DataFrame(results).sort_values('rmsle_100').reset_index(drop=True)
+lb[['name','mae','rmse','rmsle_100','fit_sec']].rename(
+    columns={'name':'Model','mae':'MAE','rmse':'RMSE','rmsle_100':'RMSLE×100','fit_sec':'Fit sec'})
+"""),
+
+        md("""---
+# 🧪 Lab 4 — Store Sales (Kaggle Corporación Favorita)
+
+3M daily rows, 4.5 years, 1,782 series (54 stores × 33 families). Real Ecuadorian retail data with external regressors (oil price, transactions, holidays).
+
+**Per-family LightGBM (33 dedicated models) is the winner** — confirms the Sales-lab pattern scales. Lands in **Kaggle top tier (RMSLE ≈ 0.394)** without competition-specific engineering.
+
+> Skip this cell if you didn't download the Kaggle data in Step 2.
+"""),
+
+        code("""import os
+if os.path.exists('data/store-sales-time-series-forecasting/train.csv'):
+    !python scripts/run_store_sales.py
+else:
+    print('⚠ Store Sales train.csv not found — skipping Lab 4')
+    print('  Go back to Step 2 to download it from Kaggle')
+"""),
+
+        code("""import json, pandas as pd, os
+if os.path.exists('scripts/store_sales_results.json'):
+    results = json.loads(open('scripts/store_sales_results.json').read())
+    lb = pd.DataFrame(results).sort_values('rmsle').reset_index(drop=True)
+    lb[['name','mae','rmse','rmsle','fit_sec']].rename(
+        columns={'name':'Model','mae':'MAE','rmse':'RMSE','rmsle':'RMSLE','fit_sec':'Fit sec'})
+else:
+    pd.DataFrame({'note': ['Lab 4 skipped — no Kaggle data']})
+"""),
+
+        md("""---
+# 🏆 Cross-Lab Unified Leaderboard
+
+The headline numbers from all 4 labs, side-by-side.
+"""),
+
+        code("""import json, pandas as pd, os
+
+unified = []
+
+# Lab 1 — Inventory (best from df_experiments_results.json)
+try:
+    r1 = json.loads(open('scripts/df_experiments_results.json').read())
+    best_a = min(r1['experiment_a'], key=lambda x: x['mae'])
+    unified.append({
+        'Lab': '1. Inventory',
+        'Rows': '73k',
+        'Series': 100,
+        'Best Model': best_a['name'],
+        'MAE': best_a['mae'],
+        'Kaggle metric': 'n/a',
+        'Notes': 'DF available → residual learning unlocks MAE 7.4 ceiling',
+    })
+except FileNotFoundError:
+    pass
+
+# Lab 2 — Sales (from inline results_sales)
+try:
+    best_s = min(results_sales, key=lambda x: x['MAE'])
+    unified.append({
+        'Lab': '2. Sales',
+        'Rows': '76k',
+        'Series': 100,
+        'Best Model': best_s['Model'],
+        'MAE': best_s['MAE'],
+        'Kaggle metric': 'n/a',
+        'Notes': 'Per-category routing confirms Promo + Epidemic flags',
+    })
+except NameError:
+    pass
+
+# Lab 3 — Food Demand
+try:
+    r3 = json.loads(open('scripts/food_demand_results.json').read())
+    best_mae = min(r3, key=lambda x: x['mae'])
+    best_rmsle = min(r3, key=lambda x: x['rmsle_100'])
+    unified.append({
+        'Lab': '3. Food Demand',
+        'Rows': '457k',
+        'Series': 3927,
+        'Best Model': f"{best_rmsle['name']} (RMSLE) · {best_mae['name']} (MAE)",
+        'MAE': best_mae['mae'],
+        'Kaggle metric': f"RMSLE×100 = {best_rmsle['rmsle_100']}",
+        'Notes': 'Only 4 cuisines → per-cuisine routing loses to global',
+    })
+except FileNotFoundError:
+    pass
+
+# Lab 4 — Store Sales
+try:
+    r4 = json.loads(open('scripts/store_sales_results.json').read())
+    best4 = min(r4, key=lambda x: x['rmsle'])
+    unified.append({
+        'Lab': '4. Store Sales',
+        'Rows': '3M',
+        'Series': 1782,
+        'Best Model': best4['name'],
+        'MAE': best4['mae'],
+        'Kaggle metric': f"RMSLE = {best4['rmsle']}",
+        'Notes': 'Per-family pattern scales to 33 categories cleanly',
+    })
+except FileNotFoundError:
+    pass
+
+pd.DataFrame(unified)
+"""),
+
+        md("""---
+# 📚 What you just ran
+
+This notebook executed **the entire forecasting portfolio** in a single Run All. To go deeper:
+
+| If you want… | Open |
+|---|---|
+| The full CRISP-ML(Q) walkthrough per lab | `notebooks/*_CRISPML.ipynb` (4 notebooks in the repo) |
+| The "two ceilings" residual experiment in detail | [`EXPERIMENT_DF_RESIDUAL.md`](https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPERIMENT_DF_RESIDUAL.md) |
+| Lessons that generalize across labs | [`LESSONS_LEARNED.md`](https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/LESSONS_LEARNED.md) |
+| Business-level explanation (no Python) | [`EXPLICADO_PARA_UN_ADULTO_DE_NEGOCIOS.md`](https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPLICADO_PARA_UN_ADULTO_DE_NEGOCIOS.md) |
+| Live Streamlit demos | [Inventory](https://crisp-ml-retail-forecasting-inventory.streamlit.app) · [Sales](https://crisp-ml-retail-forecasting-sales.streamlit.app) |
+
+— [oscarponce.com](https://oscarponce.com) · Junio 2026
+"""),
+    ]
+
+
 def main() -> None:
     build_notebook(cells_food_demand(),  NB_DIR / "Food_Demand_Forecasting_CRISPML.ipynb")
     build_notebook(cells_store_sales(), NB_DIR / "Store_Sales_Forecasting_CRISPML.ipynb")
+    build_notebook(cells_colab_all_labs(), NB_DIR / "Colab_All_Labs.ipynb")
 
 
 if __name__ == "__main__":
