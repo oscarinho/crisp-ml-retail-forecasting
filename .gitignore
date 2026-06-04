@@ -56,8 +56,14 @@ Thumbs.db
 catboost_info/
 notebooks/catboost_info/
 
-# Vic's external comparison material (856 MB pickle inside, kept locally only)
-CRISP-ML-vic/
+# PyTorch Lightning training logs
+lightning_logs/
+notebooks/lightning_logs/
 
-# Store-Sales raw train.csv exceeds GitHub 100MB file limit — see data card for download
-data/store-sales-time-series-forecasting/train.csv
+# Archive — exploratory work (Sales, Food Demand, Store Sales labs) moved here.
+# Kept on disk locally for reference but not part of the publishable single-lab repo.
+# Uncomment the next line to keep archive/ out of git entirely:
+# archive/
+
+# Store-Sales raw train.csv (in archive/) exceeds GitHub 100MB file limit
+archive/data/store-sales-time-series-forecasting/train.csv

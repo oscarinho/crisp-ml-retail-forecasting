@@ -741,6 +741,26 @@ st.markdown(f"""
 <div class='sub-header'>Inventory forecasting · 73,100 retail records · 5 stores · 20 products</div>
 """, unsafe_allow_html=True)
 
+# ─── Headline Finding Banner — Two Ceilings ───────────────────────────────────
+st.markdown(f"""
+<div style='background:rgba(74,103,176,0.07); border-left:3px solid {INFO};
+            padding:0.9rem 1.2rem; margin:1.2rem 0 0.4rem;
+            font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
+            color:{SLATE}; line-height:1.55;'>
+  <b style='color:{INFO}; letter-spacing:0.08em; font-size:0.72rem;'>HEADLINE FINDING ·</b>
+  This dataset has <b style='color:{ESPRESSO_GOLD};'>two MAE ceilings</b> depending on
+  whether <code style='background:rgba(201,168,106,0.12); padding:0.05rem 0.35rem;
+  border-radius:3px; font-size:0.78rem;'>Demand Forecast</code> is available as a prior
+  at inference time:
+  <b>MAE&nbsp;69</b> (no DF, pure prediction) →
+  <b style='color:{ESPRESSO_GOLD};'>MAE&nbsp;7.4</b> (DF as residual prior).
+  The framing decision is 10× more impactful than the model decision.
+  <a href='https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPERIMENT_DF_RESIDUAL.md'
+     style='color:{INFO}; text-decoration:underline; text-underline-offset:2px;'
+     target='_blank'>Full writeup →</a>
+</div>
+""", unsafe_allow_html=True)
+
 # ─── KPI Strip ────────────────────────────────────────────────────────────────
 view_df = df.copy()
 if sel_store    != "All": view_df = view_df[view_df["Store ID"]  == sel_store]
