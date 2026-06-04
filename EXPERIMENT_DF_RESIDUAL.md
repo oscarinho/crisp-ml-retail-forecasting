@@ -1,11 +1,19 @@
-# Two ceilings, not one — what Demand Forecast really does to MAE
+# Two MAE plateaus, not one — what Demand Forecast does to MAE on this dataset
 
-A 90-day holdout experiment + 18-window champion-challenger backtest, replacing one number ("MAE ≈ 69 is the noise floor") with a more honest framing: **the dataset has two ceilings depending on whether you have access to `Demand Forecast` at inference time.**
+A 90-day holdout experiment + 18-window champion-challenger backtest. On this Kaggle retail
+dataset, replacing one number ("MAE ≈ 69 is the noise floor") with a more granular framing:
+**this dataset has two distinct MAE plateaus depending on whether `Demand Forecast` enters
+the pipeline as a residual prior or not.**
 
-- **Without DF** (model alone, contextual features): MAE ≈ **69**
-- **With DF as a prior** (residual learning, model corrects DF): MAE ≈ **7.4**
+- **Without DF** (model trained directly on `Units Sold`, multivariate ML methods using
+  `Inventory Level`): MAE ≈ **69** on this holdout
+- **With DF as a prior** (residual learning, model corrects DF): MAE ≈ **7.4** on this holdout
 
-The 62-unit gap is **not modeling skill**. It's the *availability of a published forecast signal in production*.
+This 62-unit gap is **largely a function of how the existing forecast signal enters the
+pipeline** under the synthetic noise structure of this dataset, not of choosing a better
+model within either regime. Real datasets will narrow this gap (DF on real data has higher
+MAE than this synthetic near-oracle); the design pattern of "use the existing forecast as
+a prior, learn the residual" generally still applies.
 
 > Date: 2026-06-01 · Dataset: `data/retail_store_inventory.csv` · 73k rows · 90-day holdout for Exp A, rolling 30-day windows for Exp B.
 > Reproduce: `python scripts/df_experiments.py`
@@ -91,24 +99,30 @@ That raised a fair counter-question: *"Demand Forecast should enter the model so
 
 ### What the numbers say
 
-1. **Framing > model choice.** Direct vs Residual is **10× more impactful** on MAE (62 unit gap) than the choice of algorithm (~0.04 unit gap among residual variants). The single most valuable engineering decision is *how the prior signal enters the pipeline*, not which gradient booster you pick.
+1. **On this dataset, the framing decision dominates the algorithm decision.** Direct-vs-Residual moves MAE by ~62 units; the choice between HGB / RF / LightGBM within the residual regime moves MAE by ~0.04 units. The two effects are measured on different scales; the takeaway is that *how the prior signal enters the pipeline* explains far more variance in holdout MAE than the choice of gradient booster within the residual family.
 
-2. **In this dataset, champion-challenger rotation is overhead, not value.** HGB_residual wins ~94% of the time and the runner-up sits 0.02 MAE behind. Operational cost of rotating models monthly > the ~0.02 MAE you'd recover. In datasets with real external shocks (COVID, recalls, viral products), stability would drop to ~60-70% and rotation would pay off ~30-40% of the time. Here it doesn't.
+2. **In this dataset, champion-challenger rotation is overhead, not value.** HGB_residual wins ~94% of windows and the runner-up sits 0.02 MAE behind. Operational cost of rotating models monthly > the ~0.02 MAE you'd recover. In datasets with real external shocks (COVID, recalls, viral products), stability would likely drop and rotation could pay off. Here it doesn't.
 
-3. **Direct models are inadmissible if DF is available.** Across every window, every direct contender lands at MAE 67–71. They never come close. If you have DF, never train direct.
+3. **On this dataset, direct models are dominated when DF is available.** Across every window, every direct contender lands at MAE 67–71; every residual variant lands at MAE 7.2–7.6. The plateaus are clearly separated for this dataset. Whether this separation transfers to a non-synthetic dataset depends on how close that dataset's existing forecast is to ground truth — for a synthetic ρ=0.997 column the separation is extreme, for a real ρ=0.75 forecast it would be smaller.
 
-4. **DF puro is a respectable baseline** but always dominated. Across all 18 windows, no contender ever fell below DF puro on a single window. MAE 8.31 vs MAE 7.39 for HGB_residual — small absolute gap, big relative one.
+4. **DF puro is a respectable baseline** but always dominated. Across all 18 windows, no contender ever fell below DF puro on a single window. MAE 8.31 vs MAE 7.39 for HGB_residual — small absolute gap, big relative one *on this dataset*.
 
 ---
 
-## The two-ceiling framing
+## The two-plateau framing (on this dataset)
 
-| Regime | MAE ceiling | What it implies |
+| Regime | MAE plateau on this dataset | What it implies |
 |---|---:|---|
-| **DF unavailable** in production (e.g. green-field forecasting, no legacy planning system) | ~69 | Real noise floor for the contextual features. Validated by 11+ model families: LightGBM, RandomForest, Stacking, Prophet, ARIMA, ETS, LSTM, CatBoost, HGB, ExtraTrees, NHITS, TFT |
-| **DF available** in production (legacy ERP / vendor forecast / vendor-managed inventory) | ~7.4 | What you deploy when you respect the residual-learning pattern. The model contributes ~11% MAE improvement, almost entirely from bias correction |
+| **DF unavailable** in production (e.g. green-field forecasting, no legacy planning system) | ~69 | The plateau hit by the multivariate ML methods that use `Inventory Level` (LightGBM, RandomForest, Stacking, CatBoost, HGB, ExtraTrees). Univariate methods on this dataset (ARIMA MAE 89, ETS 89, LSTM 89, Prophet 112) cannot reach this plateau because they don't use cross-sectional features. The number reflects the noise structure of this synthetic dataset and the feature set used. |
+| **DF available** in production (legacy ERP / vendor forecast / vendor-managed inventory) | ~7.4 | What residual learning achieves on this holdout, with HGB / RF / LightGBM all within 0.05 MAE of each other. The improvement vs DF puro (~11%) is almost entirely from bias correction (+5.05 → +0.10). |
 
-**The "MAE 69 is the noise floor" claim in the original README was technically correct but **incomplete**.** It applies only to the no-DF regime. For practitioners deploying inside an S&OP function, the relevant ceiling is **~7.4 from residual learning**, and the model that gets there is HistGradientBoosting — not the LightGBM stacking ensemble currently in `model/model.pkl`.
+The "MAE 69 is the noise floor" claim in the original README was technically correct but **incomplete**. It applies only to the no-DF regime, and only to the multivariate ML methods on this feature set. For practitioners deploying inside an S&OP function with a DF column available, the relevant plateau on this dataset is **~7.4 from residual learning**, and the model that gets there is HistGradientBoosting.
+
+> **Caveat:** these plateaus are specific to this dataset and feature set. The 1,500× gap
+> between framing (~62 MAE) and algorithm choice (~0.04 MAE) is unusually extreme because
+> `Demand Forecast` is a synthetic near-oracle (ρ=0.997 with target). On real data with a
+> noisier existing forecast the gap will narrow — but the design principle (residual prior
+> instead of dropped feature) generalizes.
 
 ---
 

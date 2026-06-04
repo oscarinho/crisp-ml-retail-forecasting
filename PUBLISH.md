@@ -38,48 +38,54 @@ Estructura:
 > **Imagen sugerida:** hero chart (ver abajo) o quote card "MAE 69 → 7.4".
 
 ```
-La diferencia entre un pronóstico de demanda con error de 69 unidades
-o 7.4 unidades no está en el modelo. Está en una decisión que casi
-todo curso de Machine Learning enseña al revés.
+En el dataset de retail con el que estuve experimentando (73,000
+registros, Kaggle), la diferencia entre pronosticar la demanda
+con error de 69 unidades o 7.4 está en cómo entra una columna
+al pipeline. No en qué modelo eliges.
 
 ──────────────────
 
 𝗘𝗹 𝗲𝘅𝗽𝗲𝗿𝗶𝗺𝗲𝗻𝘁𝗼
-Mismo dataset (73,000 registros de retail). Mismo split temporal.
-Diez familias de modelos: LightGBM, Random Forest, Prophet, ARIMA,
-LSTM, CatBoost, ExtraTrees, ETS, Stacking, HistGradientBoosting.
+Mismo dataset, mismo split temporal. Las familias ML multivariadas
+que usan Inventory Level (LightGBM, RandomForest, Stacking, HGB,
+CatBoost, ExtraTrees) convergen todas a MAE ≈ 69. Los métodos
+univariados (ARIMA, ETS, LSTM, Prophet) topan en la media (~89),
+porque no pueden usar features cross-section.
 
-Todos convergen al mismo error: MAE ≈ 69.
-Sin importar el modelo. Sin importar los hiperparámetros.
+Ningún modelo, con ningún hiperparámetro, baja del piso 69
+sin acceso al forecast existente.
 
 Hasta que cambias UNA cosa.
 
 𝗟𝗮 𝗱𝗲𝗰𝗶𝘀𝗶𝗼́𝗻 𝗾𝘂𝗲 𝗶𝗺𝗽𝗼𝗿𝘁𝗮
 La columna "Demand Forecast" del dataset es el pronóstico que ya
-publica el sistema de planning. Tiene correlación 0.997 con la
-demanda real.
+publica el sistema de planning. En este dataset sintético tiene
+correlación 0.997 con la demanda real.
 
 ▸ Si la usas como feature → leakage, el modelo hace trampa
-▸ Si la dropeas → noise floor, MAE 69 (lo que enseñan en los cursos)
+▸ Si la dropeas → MAE 69 (la lectura purista del benchmark)
 ▸ Si la usas como prior y el modelo solo corrige su error →
-   MAE 7.4 (90% menos error)
+   MAE 7.4 (90% menos error en este dataset)
 
-𝗘𝗹 𝗮𝗽𝗿𝗲𝗻𝗱𝗶𝘇𝗮𝗷𝗲
-En cualquier ERP/MRP real, el pronóstico del sistema YA está
-publicado una semana antes. No es información futura. Está
-disponible. Ignorarla por "purismo metodológico" es regalarle
-90% de MAE al techo de tu pipeline.
+𝗟𝗼 𝗾𝘂𝗲 𝗺𝗲 𝗹𝗹𝗲𝘃𝗼
+En muchos sistemas reales de S&OP/MRP el forecast se publica
+días o semanas antes del prediction window. No es información
+futura — es input conocido. Ignorarla por "purismo metodológico"
+es discutible cuando lo que estás midiendo es performance de
+despliegue, no skill de predicción pura.
 
-El framing decide más que el modelo. 10x más.
+En este dataset específico, el gap entre regímenes (62 MAE)
+es enorme comparado con el gap entre algoritmos dentro del
+régimen residual (0.04 MAE). En datos reales con un forecast
+existente menos perfecto, ambos gaps se acortan — pero el
+patrón de diseño (DF como prior, no como feature dropeado)
+sigue aplicando.
 
 ──────────────────
 
-El reto de la mayoría de proyectos de IA en operaciones no es
-elegir bien el algoritmo. Es decidir qué señales del negocio
-entran al modelo y cómo.
-
-👉 Análisis completo (notebook + backtest 18 ventanas) en mi
-repositorio: github.com/oscarinho/crisp-ml-retail-forecasting
+👉 Notebook + backtest 18 ventanas + writeup honesto sobre
+qué generaliza y qué no:
+github.com/oscarinho/crisp-ml-retail-forecasting
 
 #MachineLearning #DemandForecasting #SupplyChain #CRISPML #DataScience
 ```
@@ -93,58 +99,65 @@ repositorio: github.com/oscarinho/crisp-ml-retail-forecasting
 > **Imagen:** scoreboard del notebook (Pipeline Summary).
 
 ```
-¿Por qué un dataset de retail con ρ=0.997 entre Demand Forecast y
-Units Sold tiene DOS techos de MAE válidos en producción?
+En un dataset de retail con ρ=0.997 entre Demand Forecast y
+Units Sold (sí, una correlación obscenamente alta — el dataset es
+sintético, hay que tenerlo presente) observamos DOS mesetas de MAE
+claramente separadas según cómo entra esa columna al pipeline.
 
 ──────────────────
 
-Hicimos el experimento por triplicado:
-
-𝗧𝗲𝗰𝗵𝗼 𝟭 — sin DF (pure prediction)
-LightGBM full features         MAE 69.1
+𝗠𝗲𝘀𝗲𝘁𝗮 𝟭 — sin DF
+Multivariados ML (con Inventory Level):
+LightGBM Stage 2               MAE 69.1
 Stacking ensemble              MAE 68.9
-HistGradientBoosting Tier 1    MAE 69.0
-CatBoost Tier 1                MAE 69.1
+HistGradientBoosting           MAE 69.0
+CatBoost                       MAE 69.1
+RandomForest                   ~69
+
+Univariados (sin Inventory Level):
 LSTM multivariate              MAE 88.9
 ARIMA auto                     MAE 89.1
 ETS Holt-Winters               MAE 89.4
 Prophet                        MAE 112.0
 
-Diez familias. Todas chocan con el mismo techo ~69. Eso NO es falla
-de modelado — es el noise floor del problema cuando autocorrelación
-intra-grupo ≈ 0.
+Las familias ML multivariadas que usan Inventory Level convergen
+a MAE ~69. Las univariadas no llegan ahí porque no pueden usar
+features cross-section. Ningún modelo, sin DF, baja del piso 69
+en este dataset.
 
-𝗧𝗲𝗰𝗵𝗼 𝟮 — DF como prior (residual learning)
-Reformular el target a: y = Units Sold − Demand Forecast
-Predicción final: pred = DF + model.predict(features)
+𝗠𝗲𝘀𝗲𝘁𝗮 𝟮 — DF como prior (residual learning)
+Reformular el target: y = Units Sold − Demand Forecast
+Predicción final:    pred = DF + model.predict(features)
 
 DF puro                        MAE 8.35 (bias +5.05)
-DF + HGB residual              MAE 7.43 (bias +0.10) ← 50x bias↓
+DF + HGB residual              MAE 7.43 (bias +0.10)
 DF + RandomForest residual     MAE 7.45
 DF + LightGBM residual         MAE 7.46
 
 Champion-Challenger 18 ventanas rolling: HGB residual gana 17/18.
 
 𝗟𝗼 𝗶𝗻𝘁𝗲𝗿𝗲𝘀𝗮𝗻𝘁𝗲
-El delta entre familias en régimen residual: 0.04 MAE.
-El delta entre régimenes (direct vs residual): 62 MAE.
+En este experimento, el gap entre mesetas (~62 MAE) es muchísimo
+mayor que el gap entre algoritmos dentro de la meseta residual
+(~0.04 MAE). La decisión de cómo entra DF al pipeline pesa más
+que la elección del gradient booster — en este dataset específico.
 
-→ El framing decide 1,500x más que el modelo en este dataset.
+𝗖𝗮𝘃𝗲𝗮𝘁 𝗶𝗺𝗽𝗼𝗿𝘁𝗮𝗻𝘁𝗲
+DF acá es un near-oracle sintético (ρ=0.997). En datos reales
+de producción, el forecast existente tendrá MAE 30-60 contra
+las ventas reales y correlación 0.7-0.85. El gap entre mesetas
+se acorta proporcionalmente, pero el patrón de diseño
+(residual prior > feature dropeado) generaliza.
 
-𝗤𝘂é 𝗮𝗽𝗿𝗲𝗻𝗱𝗶́
-Cuando el ERP ya publica un forecast, el modelo NO debe re-derivar
-estacionalidad/holidays desde cero. Debe aprender el ERROR
-ESTRUCTURADO del sistema existente. Eso es lo que hace residual
-learning bien planteado.
-
-Y por qué importa que NO sea leakage:
-- DF se publica 1+ semana antes del prediction window
-- Es input conocido en tiempo de inferencia
-- El planner humano ya lo lee primero — el modelo lo corrige
+𝗤𝘂é 𝗺𝗲 𝗹𝗹𝗲𝘃𝗼
+Cuando el ERP ya publica un forecast, vale la pena que el modelo
+aprenda el error estructurado del sistema existente en lugar de
+re-derivar estacionalidad y holidays desde cero. Eso es lo que
+hace residual learning bien planteado.
 
 ──────────────────
 
-Notebook + champion-challenger backtest + writeup completo:
+Notebook + champion-challenger backtest + writeup con caveats:
 github.com/oscarinho/crisp-ml-retail-forecasting
 
 #MachineLearning #ResidualLearning #TimeSeries #CRISPML #MLOps
@@ -158,47 +171,54 @@ github.com/oscarinho/crisp-ml-retail-forecasting
 
 ```
 Same dataset. Same train/test split. Same model families.
-MAE 69 vs MAE 7.4.
+MAE 69 vs MAE 7.4 on this holdout.
 
-The 90% reduction had nothing to do with the model.
+The gap is largely about how one column enters the pipeline.
 
-In any retail ERP, the system already publishes a Demand Forecast
-1+ week before the prediction window. Standard ML workflow drops
-it as a "leakage trap" (ρ=0.997 with target). That's correct for
-pure-prediction benchmarking — and wrong for production.
+The dataset is a Kaggle synthetic with a `Demand Forecast`
+column that correlates ρ=0.997 with the target (yes, that's
+suspicious — and the point). Standard ML workflow drops it as
+a leakage trap. That's correct for benchmarking pure-prediction
+skill, but in many production S&OP systems the existing forecast
+is genuinely available in advance — not future information.
 
-The fix is one line of code:
+Reframing it as a residual prior:
    target = Units Sold − Demand Forecast        # residual
    pred   = Demand Forecast + model(features)   # add back at inference
 
-Across 10 model families on the same 73k retail dataset:
-• No-DF regime: every family converges to MAE ≈ 69 (the noise floor)
-• DF-as-prior regime: every family converges to MAE ≈ 7.4
+On this dataset:
+• No-DF regime, multivariate ML methods → MAE ≈ 69 plateau
+• No-DF regime, univariate methods (ARIMA/ETS/LSTM/Prophet) → ~89 (mean baseline)
+• DF-as-residual-prior regime → MAE ≈ 7.4 (HGB / RF / LightGBM within 0.05)
 
 18-window rolling backtest: HGB residual wins 17/18.
 
-The framing decision was 1,500x more impactful than the algorithm
-decision. Worth keeping in mind next time someone asks which model
-to use.
+Caveat: DF here is a synthetic near-oracle. On real data with a
+noisier existing forecast, both gaps narrow — but the design
+pattern (residual prior > dropped feature) still applies. The
+"which framing" decision in this experiment moved MAE far more
+than "which gradient booster" within either framing did.
 
-Full notebook + backtest: github.com/oscarinho/crisp-ml-retail-forecasting
+Full notebook + backtest + caveats:
+github.com/oscarinho/crisp-ml-retail-forecasting
 
 #MachineLearning #DemandForecasting #SupplyChain #DataScience
 ```
 
 ---
 
-## Carrusel 5 slides
+## Carrusel 6 slides
 
 Si prefieres carrusel sobre post de texto largo. Cada slide = 1 idea, fuente grande, Orbitron/IBM Plex Mono para mantener identidad del repo.
 
 | # | Headline | Body |
 |---|---|---|
-| 1 | **MAE 69 → 7.4** | Misma data. Mismo modelo. Una decisión de framing. |
-| 2 | **El experimento** | 10 familias de modelos. 73,000 registros. Sin DF: todos convergen a MAE ≈ 69. |
-| 3 | **El insight** | El ERP ya publica un forecast. Tratarlo como prior (no como feature) baja el techo a 7.4. |
-| 4 | **La fórmula** | `target = Sales − DF`<br>`pred = DF + model(features)`<br>Bias: +5.05 → +0.10 (50x ↓) |
-| 5 | **CTA** | Notebook + backtest 18 ventanas → github.com/oscarinho/crisp-ml-retail-forecasting |
+| 1 | **MAE 69 → 7.4** | En este dataset, mismo modelo, distinto framing del forecast existente. |
+| 2 | **El experimento** | 73,000 registros. Sin DF, los métodos ML multivariados convergen a MAE ≈ 69; los univariados topan en ~89. |
+| 3 | **El insight** | Tratar DF como prior (no como feature dropeado) baja la meseta de MAE a 7.4 en este experimento. |
+| 4 | **La fórmula** | `target = Sales − DF`<br>`pred = DF + model(features)`<br>Bias: +5.05 → +0.10 |
+| 5 | **Caveat** | DF acá es un near-oracle sintético (ρ=0.997). En datos reales el gap es menor — el patrón generaliza, los números no. |
+| 6 | **CTA** | Notebook + backtest 18 ventanas → github.com/oscarinho/crisp-ml-retail-forecasting |
 
 ---
 

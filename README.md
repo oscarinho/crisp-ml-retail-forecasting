@@ -15,54 +15,76 @@ The framing decision is **10× more impactful** than the model decision.
 
 ---
 
-## The headline finding
+## The headline finding (in this dataset, under this setup)
 
-This dataset has **two distinct MAE ceilings**, not one:
+On the Kaggle retail dataset used here, the experiment surfaces **two distinct MAE plateaus** —
+an observation, not a universal law:
 
-| Regime | Best MAE | What it means |
+| Regime | MAE on this holdout | What was observed |
 |---|---:|---|
-| **No DF available** — model only | **~69** | Real noise floor when forecasting from scratch. Validated by 10+ model families: LightGBM, RandomForest, Stacking, Prophet, ARIMA, ETS, LSTM, CatBoost, HistGradientBoosting, ExtraTrees. |
-| **DF available** — residual / DF as prior | **~7.4** | What you actually get to deploy when a planning system already publishes a forecast. The model corrects ~5 units of systematic bias. |
+| **No DF available** — model only | **~69** | Best result achieved by the multivariate ML methods (LightGBM, RandomForest, Stacking, CatBoost, HistGradientBoosting, ExtraTrees) that use the `Inventory Level` feature. Univariate time-series methods (ARIMA, ETS, LSTM, Prophet, AutoTheta) cannot use that feature and topped out near the mean baseline (~89), with Prophet at MAE 112. |
+| **DF available** — residual / DF as prior | **~7.4** | Achieved by training on `Units Sold − Demand Forecast` and adding DF back at inference. The model contributes mostly bias correction (~5 unit overshoot in DF → ~0.1 in the residual prediction). |
 
-The 62-unit gap (90% MAE reduction) is **environmental, not modeling skill**. It comes from
-how the existing forecast enters the pipeline:
+On this dataset, the 62-unit gap (90% MAE reduction) is **largely a function of how the existing
+forecast enters the pipeline**, not of model choice within either regime:
 
-- ❌ As a feature → leakage (ρ=0.997 with target) → drop it
-- ✅ As a prior the model corrects → `pred = DF + model(features)` → MAE drops to 7.4
+- ❌ DF as a feature → leakage (ρ=0.997 with target on this dataset) → drop it
+- ✅ DF as a prior the model corrects → `pred = DF + model(features)` → MAE drops to 7.4
 
-Once you cross into the residual regime, the model family barely matters:
+Within the residual regime *on this holdout*, the three algorithms tested cluster within
+0.05 MAE of each other:
 
 | Strategy | MAE | Bias |
 |---|---:|---:|
 | DF puro (no model) | 8.35 | +5.05 (systematic overshoot) |
 | Stage 2 LightGBM (no DF anywhere) | 69.1 | ~−1 |
-| **Residual: DF + HGB(features)** | **7.43** | **+0.10** ← 50× bias reduction |
+| **Residual: DF + HGB(features)** | **7.43** | **+0.10** |
 | Residual: DF + RandomForest(features) | 7.45 | +0.13 |
 | Residual: DF + LightGBM(features) | 7.46 | +0.15 |
 
-An 18-window champion-challenger backtest (§4.14) shows **HGB residual wins 17 of 18
-windows**. Direct vs Residual changes MAE by 62 units; choice of algorithm (HGB / RF / LightGBM)
-changes MAE by 0.04.
+An 18-window champion-challenger backtest (§4.14) shows **HGB residual winning 17 of 18 windows**
+on this dataset. The headline contrast — **62 MAE units between regimes vs. 0.04 MAE between
+algorithms within the residual regime** — is what the rest of this README and notebook unpack.
 
 → **Full analysis:** [`EXPERIMENT_DF_RESIDUAL.md`](EXPERIMENT_DF_RESIDUAL.md)
 
 ---
 
-## Why this matters in production
+## What this experiment does and does not show
 
-The standard ML workflow treats `Demand Forecast` as a leakage trap and drops it. That's
-correct when you're benchmarking pure-prediction skill — but it's the wrong framing for
-deployment.
+**What it shows (measured here):**
 
-In any real S&OP / MRP system:
+- On this synthetic Kaggle dataset, the residual-learning framing produces a much lower
+  holdout MAE than training a model to predict `Units Sold` directly.
+- Within the residual regime on this holdout, three tree-based algorithms converge to
+  nearly identical MAE.
+- DF puro on this dataset has a +5.05 unit systematic overshoot that residual learning
+  reduces to +0.10.
 
-- The Demand Forecast is **published 1+ weeks before** the prediction window
-- It's a known input at inference time, not leaked future information
-- Demand planners read it first; the model should *correct* it, not pretend it doesn't exist
+**What it does not show (and what to be careful about):**
 
-This is the bridge from **portfolio ML** to **production forecasting**: the model's job is
-to learn the **structured error** of the existing system (which knows seasonality, holidays,
-trend) without re-deriving the easy parts from scratch.
+- This is a **synthetic dataset**. `Demand Forecast` here is a near-oracle column
+  (ρ=0.997 with the target). In a real production setting, an existing planner's forecast
+  typically has MAE 30–60 against actuals — closer correlation 0.7–0.85 with the target.
+  The residual gain on real data is usually smaller in absolute terms (and includes
+  variance reduction, not just bias correction) but the structural argument still holds.
+- These ceilings are **specific to the feature set, the time split, and the noise structure
+  of this dataset**. They are not universal claims about retail forecasting.
+- The "framing matters more than model choice" observation is true *in this experiment, on
+  this dataset, within the feature/split regime tested* — not a general law of ML.
+
+## Why this still matters in practice
+
+Many production S&OP / MRP systems do publish a Demand Forecast in advance of the
+prediction window, in which case treating it as a known input (not as leaked future data)
+is a defensible engineering choice. The design pattern this notebook illustrates —
+**learn the residual of the existing forecast instead of replacing it from scratch** — is
+sound regardless of whether the absolute numbers reported here transfer to your data.
+
+The wrong move, on most real datasets, is to drop the existing forecast entirely under
+the assumption that doing so is "the rigorous choice." It is rigorous only against the
+narrow benchmark of pure-prediction skill; for deployment, the residual framing is usually
+the more honest baseline.
 
 ---
 
@@ -76,8 +98,11 @@ by Anirudh Singh Chauhan · License: CC0 · See [`data/retail_store_inventory.md
 - **Target:** `Units Sold` — censored by `Inventory Level` (stockouts cap observed sales)
 - **Distinctive column:** `Demand Forecast` (the existing system's prediction, the focus of
   this notebook's headline insight)
-- **EDA quirk:** within-group autocorrelation ≈ 0 — the data is memoryless by construction,
-  which is why the headline MAE 69 (no-DF) is a **data ceiling**, not a modeling failure
+- **EDA quirk:** within-group autocorrelation ≈ 0 on this dataset — the synthetic generator
+  produced memoryless series, which is why lag features add no signal and the MAE 69
+  plateau (no-DF, multivariate ML methods) reflects the noise floor of the available
+  features rather than a modeling failure. Real retail data typically has measurable
+  autocorrelation; this finding is dataset-specific.
 
 ---
 
