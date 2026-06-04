@@ -9,8 +9,9 @@ families, on the same train/test split.
 The framing decision is **10× more impactful** than the model decision.
 
 **Author:** [Oscar Andres Ponce](https://oscarponce.com)
-**Notebook:** [`notebooks/Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb)
-**Streamlit app:** [`app/app.py`](app/app.py)
+**Notebook (EN):** [`notebooks/Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb)
+**Notebook (ES):** [`notebooks/Inventory_Forecasting_CRISPML_ES.ipynb`](notebooks/Inventory_Forecasting_CRISPML_ES.ipynb) — misma estructura, narrativa traducida
+**Streamlit app:** [`app/app.py`](app/app.py) · [inventory-lab.streamlit.app](https://inventory-lab.streamlit.app)
 
 ---
 
@@ -118,8 +119,9 @@ Phase 4 progression:
 ```
 forecasting-inventory/
 ├── notebooks/
-│   ├── Inventory_Forecasting_CRISPML.ipynb   # the lab — 96 cells, 6 CRISP-ML phases
-│   └── notebook_utils.py                     # cached() helper for disk checkpointing
+│   ├── Inventory_Forecasting_CRISPML.ipynb     # the lab (EN) — 96 cells, 6 CRISP-ML phases
+│   ├── Inventory_Forecasting_CRISPML_ES.ipynb  # Spanish edition (same code, translated narrative)
+│   └── notebook_utils.py                       # cached() helper for disk checkpointing
 ├── data/
 │   ├── retail_store_inventory.csv            # Kaggle dataset (~6 MB)
 │   └── retail_store_inventory.md             # Dataset card (provenance, EDA quirks)
