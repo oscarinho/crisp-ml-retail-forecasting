@@ -730,6 +730,30 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
+# ─── Emergency Advisory (used by alert strip + reorder tab) ───────────────────
+_recent_df = df.copy()
+_recent_df["Date"] = pd.to_datetime(_recent_df["Date"])
+_cutoff = _recent_df["Date"].max() - pd.Timedelta(days=30)
+_recent = _recent_df[_recent_df["Date"] >= _cutoff]
+
+_advisory_global = (
+    _recent.groupby(["Store ID", "Category"])
+    .agg(
+        Avg_Daily_Demand=("Units Sold", "median"),
+        Current_Inventory=("Inventory Level", "last"),
+    )
+    .reset_index()
+)
+_advisory_global["Days_of_Supply"] = (
+    _advisory_global["Current_Inventory"]
+    / _advisory_global["Avg_Daily_Demand"].clip(lower=1)
+).round(1)
+critical_count = int((_advisory_global["Days_of_Supply"] < 3.5).sum())
+low_count = int(
+    ((_advisory_global["Days_of_Supply"] >= 3.5) & (_advisory_global["Days_of_Supply"] < 7)).sum()
+)
+total_skus = len(_advisory_global)
+
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class='issue-strip'>
@@ -741,28 +765,71 @@ st.markdown(f"""
 <div class='sub-header'>Inventory forecasting · 73,100 retail records · 5 stores · 20 products</div>
 """, unsafe_allow_html=True)
 
-# ─── Headline Finding Banner — Two Ceilings ───────────────────────────────────
+# ─── Qué hace esta app — explicación en español plano ─────────────────────────
 st.markdown(f"""
 <div style='background:rgba(74,103,176,0.07); border-left:3px solid {INFO};
-            padding:0.9rem 1.2rem; margin:1.2rem 0 0.4rem;
-            font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
-            color:{SLATE}; line-height:1.55;'>
-  <b style='color:{INFO}; letter-spacing:0.08em; font-size:0.72rem;'>HEADLINE FINDING ·</b>
-  On this synthetic Kaggle dataset, the experiment surfaces
-  <b style='color:{ESPRESSO_GOLD};'>two MAE plateaus</b> depending on whether
-  <code style='background:rgba(201,168,106,0.12); padding:0.05rem 0.35rem;
-  border-radius:3px; font-size:0.78rem;'>Demand Forecast</code> enters the pipeline
-  as a residual prior or not:
-  <b>MAE&nbsp;69</b> (no DF, multivariate ML methods) →
-  <b style='color:{ESPRESSO_GOLD};'>MAE&nbsp;7.4</b> (DF as residual prior).
-  The plateau gap (~62 MAE) dwarfs the algorithm gap (~0.04 MAE within the residual
-  regime). Caveat: DF here is a synthetic near-oracle (ρ=0.997); on real data the gap
-  is smaller, but the design pattern still applies.
-  <a href='https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPERIMENT_DF_RESIDUAL.md'
-     style='color:{INFO}; text-decoration:underline; text-underline-offset:2px;'
-     target='_blank'>Full writeup →</a>
+            padding:1rem 1.3rem; margin:1.2rem 0 0.5rem;
+            font-family:"IBM Plex Mono",monospace; font-size:0.82rem;
+            color:{SLATE}; line-height:1.65;'>
+  <b style='color:{INFO}; letter-spacing:0.1em; font-size:0.7rem;'>QUÉ HACE ESTA APP ·</b>
+  Predice <b style='color:{ESPRESSO_GOLD};'>cuántas unidades se venderán cada día</b>
+  por tienda y producto, detecta qué SKUs están en
+  <b style='color:{ESPRESSO_GOLD};'>riesgo de stockout</b> antes que ocurra, y recomienda
+  <b style='color:{ESPRESSO_GOLD};'>cuánto pedir y cuándo</b> — el objetivo es no perder
+  ventas por falta de stock ni acumular inventario muerto.
+  <div style='font-size:0.7rem; color:{PEBBLE}; margin-top:0.55rem;'>
+    Lab CRISP-ML(Q) sobre dataset Kaggle de retail (sintético).
+    <a href='https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPERIMENT_DF_RESIDUAL.md'
+       style='color:{INFO}; text-decoration:underline; text-underline-offset:2px;'
+       target='_blank'>Detalle técnico (residual learning, MAE 7.4) →</a>
+  </div>
 </div>
 """, unsafe_allow_html=True)
+
+# ─── Emergency Alert Strip ────────────────────────────────────────────────────
+if critical_count > 0:
+    _low_extra = (
+        f' <span style="color:{PEBBLE};">+{low_count} con stock bajo (3–7 días).</span>'
+        if low_count > 0 else ''
+    )
+    st.markdown(f"""
+    <div style='background:rgba(217,107,95,0.10); border:1px solid {DANGER};
+                border-left:4px solid {DANGER};
+                padding:0.7rem 1.1rem; margin:0.4rem 0 1rem;
+                font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
+                color:{SLATE}; display:flex; justify-content:space-between;
+                align-items:center; gap:1rem; flex-wrap:wrap;'>
+      <span>
+        <b style='color:{DANGER}; letter-spacing:0.1em; font-size:0.72rem;'>⚠ ALERTA CRÍTICA ·</b>
+        <b style='font-family:Orbitron,monospace; font-size:1.05rem; color:{DANGER};'>{critical_count}</b>
+        SKUs en riesgo de stockout (menos de 3 días de stock).{_low_extra}
+      </span>
+      <span style='font-size:0.65rem; color:{PEBBLE}; letter-spacing:0.18em; text-transform:uppercase;'>
+        Ver pestaña Reorder Advisory ↓
+      </span>
+    </div>
+    """, unsafe_allow_html=True)
+elif low_count > 0:
+    st.markdown(f"""
+    <div style='background:rgba(242,174,74,0.08); border-left:3px solid {WARNING_COL};
+                padding:0.6rem 1.1rem; margin:0.4rem 0 1rem;
+                font-family:"IBM Plex Mono",monospace; font-size:0.76rem;
+                color:{SLATE};'>
+      <b style='color:{WARNING_COL}; letter-spacing:0.08em; font-size:0.7rem;'>STOCK BAJO ·</b>
+      <b style='font-family:Orbitron,monospace; color:{WARNING_COL};'>{low_count}</b>
+      SKUs por debajo del buffer de 7 días — revisar Reorder Advisory.
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style='background:rgba(67,147,108,0.07); border-left:3px solid {SUCCESS};
+                padding:0.6rem 1.1rem; margin:0.4rem 0 1rem;
+                font-family:"IBM Plex Mono",monospace; font-size:0.76rem;
+                color:{SLATE};'>
+      <b style='color:{SUCCESS}; letter-spacing:0.08em; font-size:0.7rem;'>STOCK OK ·</b>
+      Los {total_skus} SKUs activos tienen cobertura ≥ 7 días.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ─── KPI Strip ────────────────────────────────────────────────────────────────
 view_df = df.copy()
@@ -887,6 +954,42 @@ with tab_sim:
                 <span style='font-family:"Fraunces",serif; font-style:italic; color:rgba(26,29,35,0.55);'>Inventory</span> {inv_in} units
             </div>
             {"<div class='prediction-advisory'>▸ Recommended reorder: <b>" + str(reorder) + " units</b></div>" if reorder > 0 else "<div class='prediction-advisory' style='border-left-color:" + SUCCESS + "; color:" + SUCCESS + ";'>✓ No reorder needed</div>"}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ─── Qué hacer — plan de acción en español ────────────────────────────
+        if cov < 0.5:
+            _action_color = DANGER
+            _action_html = (
+                f"Pide <b style='color:{DANGER};'>{reorder} unidades hoy mismo</b> — "
+                f"el stock actual no cubre la demanda proyectada."
+            )
+        elif cov < 1.2:
+            _action_color = WARNING_COL
+            _action_html = (
+                f"Considera pedir <b style='color:{WARNING_COL};'>{reorder} unidades esta semana</b> "
+                f"para mantener un buffer de 7 días."
+            )
+        else:
+            _action_color = SUCCESS
+            _action_html = (
+                f"<b style='color:{SUCCESS};'>Stock suficiente</b> — "
+                f"no requiere reabastecimiento por ahora."
+            )
+
+        st.markdown(f"""
+        <div style='background:#FFFFFF; border:1px solid var(--rule);
+                    border-left:3px solid {_action_color};
+                    padding:1rem 1.2rem; margin:0.8rem 0 1rem;
+                    font-family:"IBM Plex Mono",monospace; font-size:0.82rem;
+                    line-height:1.75;'>
+          <div style='font-family:"Fraunces",serif; font-style:italic; font-size:1.05rem;
+                      color:{INK}; margin-bottom:0.5rem;'>Qué hacer</div>
+          <div style='color:{SLATE};'>
+            ▸ Se proyectan <b>{pred_int} unidades</b> de venta diaria para este escenario.<br>
+            ▸ El stock actual ({inv_in} unidades) alcanza para <b>{cov:.1f} días</b> a ese ritmo.<br>
+            ▸ {_action_html}
+          </div>
         </div>
         """, unsafe_allow_html=True)
 
