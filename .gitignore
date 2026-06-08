@@ -72,3 +72,9 @@ archive/data/store-sales-time-series-forecasting/train.csv
 REVIEW_AND_NEW_POSTS.md
 FINAL_REVIEW.md
 LAB_PAGE_v4.md
+
+# ───── Internal working docs (not for public repo) ─────
+.claude/
+validacion/
+app/ARQUITECTURA-APP.md
+VALIDACION-ESCENARIOS.md
