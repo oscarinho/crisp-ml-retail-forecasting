@@ -690,10 +690,12 @@ def predict_p80(q80_pipeline, row_dict: dict) -> float:
 
 
 def stock_status(inventory: int, predicted: float):
+    # coverage is in DAYS of stock (inventory ÷ daily demand).
+    # Thresholds align with the 7-day reorder buffer and the Alert Strip (3.5 / 7).
     coverage = inventory / max(predicted, 1)
-    if coverage < 0.5:
+    if coverage < 3:
         return "CRITICAL — STOCKOUT RISK", DANGER, "danger", coverage
-    elif coverage < 1.2:
+    elif coverage < 7:
         return "LOW STOCK", WARNING_COL, "warning", coverage
     else:
         return "WELL STOCKED", SUCCESS, "success", coverage
@@ -1039,13 +1041,13 @@ with tab_sim:
         """, unsafe_allow_html=True)
 
         # ─── Qué hacer — plan de acción en español ────────────────────────────
-        if cov < 0.5:
+        if cov < 3:
             _action_color = DANGER
             _action_html = (
                 f"Pide <b style='color:{DANGER};'>{reorder} unidades hoy mismo</b> — "
                 f"el stock actual no cubre la demanda proyectada."
             )
-        elif cov < 1.2:
+        elif cov < 7:
             _action_color = WARNING_COL
             _action_html = (
                 f"Considera pedir <b style='color:{WARNING_COL};'>{reorder} unidades esta semana</b> "
