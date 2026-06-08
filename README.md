@@ -6,7 +6,7 @@ notebooks chase the wrong ceiling. When the production environment already publi
 of a baseline to beat takes MAE from 69 to 7.4 on the same dataset, with the same model
 families, on the same train/test split.
 
-The framing decision is **10× more impactful** than the model decision.
+On this dataset, **the framing decision dominates the algorithm decision** — direct-vs-residual moves MAE by ~62 units, while the choice of gradient booster within the residual regime moves it by ~0.04. See [`EXPERIMENT_DF_RESIDUAL.md`](EXPERIMENT_DF_RESIDUAL.md) for the full quantification and caveats.
 
 **Author:** [Oscar Andres Ponce](https://oscarponce.com)
 **Notebook (EN):** [`notebooks/Inventory_Forecasting_CRISPML.ipynb`](notebooks/Inventory_Forecasting_CRISPML.ipynb)

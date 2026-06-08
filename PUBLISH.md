@@ -19,15 +19,21 @@ Estructura:
 | Pieza | Estado | Nota |
 |---|---|---|
 | `notebooks/Inventory_Forecasting_CRISPML.ipynb` | ✅ pulido | 96 celdas, título "Two Ceilings", scoreboard nuevo |
-| `README.md` | ✅ reescrito | Headline finding visible en H2 |
-| `EXPERIMENT_DF_RESIDUAL.md` | ✅ completo | Backtest 18 ventanas, HGB residual 17/18 |
+| `notebooks/Inventory_Forecasting_CRISPML_ES.ipynb` | ✅ traducido | Edición en español, misma estructura |
+| `README.md` | ✅ reescrito | Headline finding visible, lenguaje no-numérico para evitar over-claim |
+| `EXPERIMENT_DF_RESIDUAL.md` | ✅ completo | Backtest 18 ventanas, HGB residual 17/18, caveats explícitos |
+| `CONCEPTOS_ES.md` | ✅ glosario | Términos técnicos explicados en español |
 | `archive/README.md` | ✅ explica el porqué | Lab 2/3/4 demoted con justificación |
 | `.gitignore` | ✅ limpio | `lightning_logs/`, `catboost_info/`, archive carve-outs |
 | `app/app.py` | ✅ banner aplicado | Headline finding banner debajo del header (Opción A) |
-| Hero chart PNG | ❌ falta | Código listo abajo — 1 minuto correrlo |
-| Commit | ❌ pendiente | 40+ archivos en `R` status sin commit |
+| `assets/hero_two_ceilings.png` | ✅ generado | 1200×627 listo para LinkedIn |
+| Commits aplicados | ✅ | Push hecho a `origin/main` |
+| Streamlit app desplegada | ✅ | [inventory-lab.streamlit.app](https://inventory-lab.streamlit.app) |
+| GitHub repo description | ⚠️ pendiente | Sigue diciendo "Two CRISP-ML(Q) labs — Inventory & Sales" — actualizar en Settings → About |
+| oscarponce.com/labs/demand-forecasting/ | ✅ sincronizado | Narrativa v4 en vivo + listado /labs (badge Live, tags) + og:image (hero) agregado 6-jun |
+| Programado en Notion | ✅ | "Calendario editorial LinkedIn" → Estado *Programado*, miércoles 10-jun 9am, cuerpo + gancho cargados |
 
-**TL;DR:** todo el contenido textual está listo. Falta (1) generar la imagen, (2) decidir si tocar el app o aclarar que el insight vive en notebook+README, (3) commit + push.
+**TL;DR:** todo el contenido del repo está listo. Quedan 2 ajustes externos (descripción del repo en GitHub UI + página en oscarponce.com).
 
 ---
 
@@ -240,10 +246,12 @@ ratio 1.91:1.
 
 ```
 Editorial quote card. Dark graphite background (#1a1d22). Centered
-giant number "10x" in Orbitron weight 700, color warm gold (#8B7340).
-Below in IBM Plex Mono small caps: "the framing decision is 10× more
-impactful than the model decision". Bottom-right corner small label
-"OSCAR PONCE · MMXXVI · CRISP-ML(Q)". Aspect ratio 1.91:1.
+giant two-line callout in Orbitron weight 700: top line "62 MAE"
+in warm gold (#8B7340), bottom line "0.04 MAE" in bright electric
+blue (#5BC0EB). Below in IBM Plex Mono small caps: "framing gap vs.
+algorithm gap — same dataset, same models, different framing".
+Bottom-right corner small label "OSCAR PONCE · MMXXVI · CRISP-ML(Q)".
+Aspect ratio 1.91:1.
 ```
 
 ### Post 2 (técnico) — scoreboard real
@@ -345,10 +353,10 @@ st.markdown(f"""
             padding:0.9rem 1.2rem; margin:1rem 0; font-family:"IBM Plex Mono",monospace;
             font-size:0.78rem; color:{MIST};'>
   <b style='color:{CYAN}; letter-spacing:0.08em;'>HEADLINE FINDING ·</b>
-  This dataset has two MAE ceilings depending on whether Demand Forecast is
+  On this dataset, two MAE plateaus emerge depending on whether Demand Forecast is
   available as a prior at inference time: <b>MAE 69</b> (no DF) → <b>MAE 7.4</b>
-  (DF as residual prior). The framing decision is 10× more impactful than the
-  model decision.
+  (DF as residual prior). The framing decision dominates the algorithm decision
+  in this experiment.
   <a href='https://github.com/oscarinho/crisp-ml-retail-forecasting/blob/main/EXPERIMENT_DF_RESIDUAL.md'
      style='color:{CYAN};'>Full writeup →</a>
 </div>
@@ -365,12 +373,13 @@ st.markdown(f"""
 
 Antes del primer post:
 
-- [ ] `python scripts/make_hero_chart.py` → genera la imagen
-- [x] Aplicar Opción A en `app/app.py` (banner — hecho)
-- [ ] Si quieres la app live: desplegar a Streamlit Community Cloud (5 min, gratis — instrucciones en README §"Deploy")
-- [ ] `git add -A && git commit -m "chore: archive exploratory work, polish for publication"` (mensaje sugerido — confirma antes de pushear)
-- [ ] `git push origin main`
-- [ ] Verificar que el repo en `github.com/oscarinho/crisp-ml-retail-forecasting` esté público
+- [x] `python scripts/make_hero_chart.py` → imagen generada en `assets/hero_two_ceilings.png`
+- [x] Aplicar Opción A en `app/app.py` (banner aplicado)
+- [x] Streamlit app desplegada en `inventory-lab.streamlit.app`
+- [x] Commits aplicados + push hecho a `origin/main`
+- [x] Repo público en `github.com/oscarinho/crisp-ml-retail-forecasting`
+- [ ] **Actualizar la descripción del repo en GitHub** (Settings → About) — hoy dice "Two CRISP-ML(Q) labs — Inventory & Sales", debería decir algo como *"CRISP-ML(Q) retail demand forecasting study — two MAE plateaus depending on framing of the existing forecast"*
+- [ ] **Decidir qué hacer con oscarponce.com/labs/demand-forecasting/** — la página publicada cuenta la narrativa vieja; reescribir con el draft generado en `LAB_PAGE_v4.md` o despublicar temporalmente
 - [ ] Publicar Post 1 con la imagen hero
 - [ ] Programar Post 2 para +5–7 días
 

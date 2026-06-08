@@ -67,3 +67,8 @@ notebooks/lightning_logs/
 
 # Store-Sales raw train.csv (in archive/) exceeds GitHub 100MB file limit
 archive/data/store-sales-time-series-forecasting/train.csv
+
+# ───── Internal review / planning notes — not for public repo ─────
+REVIEW_AND_NEW_POSTS.md
+FINAL_REVIEW.md
+LAB_PAGE_v4.md
