@@ -246,6 +246,24 @@ html, body, [data-testid="stAppViewContainer"] {{
     letter-spacing: 0.16em;
     text-transform: uppercase;
 }}
+.metric-status {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-top: 0.65rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--rule);
+    line-height: 1.35;
+}}
+.metric-action {{
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    margin-top: 0.25rem;
+    line-height: 1.3;
+}}
 
 /* Prediction box — classified bulletin */
 .prediction-box {{
@@ -687,6 +705,77 @@ def reorder_qty(predicted: float, inventory: int, safety_days: int = 7) -> int:
     return int(np.ceil(shortage / max(predicted, 1)) * max(predicted, 1))
 
 
+def kpi_meta(kind: str, value: float):
+    """Return (status_text, color, action_text) for a KPI based on thresholds."""
+    if kind == "demand":
+        return "ritmo base de venta", PEBBLE, "base para forecast y reorden"
+    if kind == "inventory":
+        return "stock promedio en piso", PEBBLE, "contrasta vs demanda diaria"
+    if kind == "coverage":
+        if value < 1:
+            return "⚠ stockout inminente", DANGER, "pedir hoy mismo"
+        if value < 3:
+            return "riesgo bajo de quiebre", WARNING_COL, "revisar Reorder Advisory"
+        if value < 7:
+            return "cobertura normal", SUCCESS, "mantener ritmo de reposición"
+        return "sobre-stock", INFO, "evaluar capital inmovilizado"
+    if kind == "stockout":
+        if value < 5:
+            return "operación sana", SUCCESS, "no requiere acción"
+        if value < 15:
+            return "frecuencia elevada", WARNING_COL, "subir safety buffer"
+        return "frecuencia crítica", DANGER, "revisar lead time + reorden"
+    if kind == "lift":
+        return "efecto promocional medible", ESPRESSO_GOLD, "aplicar como multiplicador en pronóstico"
+    return "", PEBBLE, ""
+
+
+def filter_by_sidebar(df_input: pd.DataFrame, store: str, category: str) -> pd.DataFrame:
+    out = df_input
+    if store != "All":
+        out = out[out["Store ID"] == store]
+    if category != "All":
+        out = out[out["Category"] == category]
+    return out
+
+
+def compute_advisory(df_input: pd.DataFrame, safety_days: int = 7, days_window: int = 30) -> pd.DataFrame:
+    """Per-(Store, Category) inventory advisory using the latest N-day window.
+
+    Sorts by Date so groupby.last() returns the *most recent* inventory
+    snapshot — without sorting, .last() falls back to row order and silently
+    misreports 'current inventory' on unsorted CSVs.
+    """
+    d = df_input.copy()
+    if d.empty:
+        return pd.DataFrame(columns=[
+            "Store ID", "Category", "Avg_Daily_Demand",
+            "Current_Inventory", "Days_of_Supply", "Risk", "Reorder_Qty",
+        ])
+    d["Date"] = pd.to_datetime(d["Date"])
+    cutoff = d["Date"].max() - pd.Timedelta(days=days_window)
+    recent = d[d["Date"] >= cutoff].sort_values("Date")
+    adv = (
+        recent.groupby(["Store ID", "Category"])
+        .agg(
+            Avg_Daily_Demand=("Units Sold", "median"),
+            Current_Inventory=("Inventory Level", "last"),
+        )
+        .reset_index()
+    )
+    adv["Days_of_Supply"] = (
+        adv["Current_Inventory"] / adv["Avg_Daily_Demand"].clip(lower=1)
+    ).round(1)
+    adv["Reorder_Qty"] = adv.apply(
+        lambda r: reorder_qty(r["Avg_Daily_Demand"], int(r["Current_Inventory"]), safety_days),
+        axis=1,
+    )
+    adv["Risk"] = adv["Days_of_Supply"].apply(
+        lambda v: "CRITICAL" if v < safety_days * 0.5 else ("LOW STOCK" if v < safety_days else "OK")
+    )
+    return adv
+
+
 # ─── Load Resources ───────────────────────────────────────────────────────────
 df              = load_data()
 pipeline, meta, is_demo = get_model()
@@ -730,29 +819,18 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-# ─── Emergency Advisory (used by alert strip + reorder tab) ───────────────────
-_recent_df = df.copy()
-_recent_df["Date"] = pd.to_datetime(_recent_df["Date"])
-_cutoff = _recent_df["Date"].max() - pd.Timedelta(days=30)
-_recent = _recent_df[_recent_df["Date"] >= _cutoff]
+# ─── Inventory Advisory (filter-aware — used by alert + KPIs + reorder tab) ──
+_filtered_df = filter_by_sidebar(df, sel_store, sel_category)
+advisory_now = compute_advisory(_filtered_df, safety_days=7)
+critical_count = int((advisory_now["Risk"] == "CRITICAL").sum())
+low_count = int((advisory_now["Risk"] == "LOW STOCK").sum())
+total_skus = len(advisory_now)
 
-_advisory_global = (
-    _recent.groupby(["Store ID", "Category"])
-    .agg(
-        Avg_Daily_Demand=("Units Sold", "median"),
-        Current_Inventory=("Inventory Level", "last"),
-    )
-    .reset_index()
-)
-_advisory_global["Days_of_Supply"] = (
-    _advisory_global["Current_Inventory"]
-    / _advisory_global["Avg_Daily_Demand"].clip(lower=1)
-).round(1)
-critical_count = int((_advisory_global["Days_of_Supply"] < 3.5).sum())
-low_count = int(
-    ((_advisory_global["Days_of_Supply"] >= 3.5) & (_advisory_global["Days_of_Supply"] < 7)).sum()
-)
-total_skus = len(_advisory_global)
+_filter_parts = [p for p in [
+    sel_store if sel_store != "All" else None,
+    sel_category if sel_category != "All" else None,
+] if p]
+_filter_label = f" en {' · '.join(_filter_parts)}" if _filter_parts else ""
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -802,7 +880,7 @@ if critical_count > 0:
       <span>
         <b style='color:{DANGER}; letter-spacing:0.1em; font-size:0.72rem;'>⚠ ALERTA CRÍTICA ·</b>
         <b style='font-family:Orbitron,monospace; font-size:1.05rem; color:{DANGER};'>{critical_count}</b>
-        SKUs en riesgo de stockout (menos de 3 días de stock).{_low_extra}
+        SKUs{_filter_label} en riesgo de stockout (menos de 3.5 días de stock).{_low_extra}
       </span>
       <span style='font-size:0.65rem; color:{PEBBLE}; letter-spacing:0.18em; text-transform:uppercase;'>
         Ver pestaña Reorder Advisory ↓
@@ -817,7 +895,7 @@ elif low_count > 0:
                 color:{SLATE};'>
       <b style='color:{WARNING_COL}; letter-spacing:0.08em; font-size:0.7rem;'>STOCK BAJO ·</b>
       <b style='font-family:Orbitron,monospace; color:{WARNING_COL};'>{low_count}</b>
-      SKUs por debajo del buffer de 7 días — revisar Reorder Advisory.
+      SKUs{_filter_label} por debajo del buffer de 7 días — revisar Reorder Advisory.
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -827,7 +905,7 @@ else:
                 font-family:"IBM Plex Mono",monospace; font-size:0.76rem;
                 color:{SLATE};'>
       <b style='color:{SUCCESS}; letter-spacing:0.08em; font-size:0.7rem;'>STOCK OK ·</b>
-      Los {total_skus} SKUs activos tienen cobertura ≥ 7 días.
+      Los {total_skus} SKUs activos{_filter_label} tienen cobertura ≥ 7 días.
     </div>
     """, unsafe_allow_html=True)
 
@@ -845,18 +923,21 @@ h_lift = ((holiday_lift.get(1, avg_demand) / max(holiday_lift.get(0, avg_demand)
 
 k1, k2, k3, k4, k5 = st.columns(5)
 kpi_data = [
-    (k1, "Avg Daily Demand",    f"{avg_demand:.0f}",   "units / day"),
-    (k2, "Avg Inventory",       f"{avg_inv:.0f}",      "units on hand"),
-    (k3, "Stock Coverage",      f"{coverage:.1f}x",    "demand days covered"),
-    (k4, "Stockout Events",     f"{stockout_pct:.1f}%","days demand > stock"),
-    (k5, "Holiday Demand Lift", f"+{h_lift:.1f}%",     "vs. non-holiday avg"),
+    (k1, "Avg Daily Demand",    f"{avg_demand:.0f}",   "units / day",         "demand",    avg_demand),
+    (k2, "Avg Inventory",       f"{avg_inv:.0f}",      "units on hand",       "inventory", avg_inv),
+    (k3, "Stock Coverage",      f"{coverage:.1f}x",    "demand days covered", "coverage",  coverage),
+    (k4, "Stockout Events",     f"{stockout_pct:.1f}%","days demand > stock", "stockout",  stockout_pct),
+    (k5, "Holiday Demand Lift", f"+{h_lift:.1f}%",     "vs. non-holiday avg", "lift",      h_lift),
 ]
-for col, label, value, delta in kpi_data:
+for col, label, value, delta, kind, raw in kpi_data:
+    status_text, status_color, action_text = kpi_meta(kind, raw)
     col.markdown(f"""
     <div class='metric-card'>
         <div class='metric-label'>{label}</div>
         <div class='metric-value'>{value}</div>
         <div class='metric-delta'>{delta}</div>
+        <div class='metric-status' style='color:{status_color};'>{status_text}</div>
+        <div class='metric-action'>→ {action_text}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1021,31 +1102,87 @@ with tab_sim:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("<div class='fig-caption'><b>Fig. 01</b>Demand elasticity across a ±20% price band — vertical rule marks the current price.</div>", unsafe_allow_html=True)
 
-        # Holiday vs. baseline
-        row_no_hol  = {**row, "Holiday/Promotion": 0}
-        row_hol     = {**row, "Holiday/Promotion": 1}
-        p_no_hol    = predict_demand(pipeline, row_no_hol)
-        p_hol       = predict_demand(pipeline, row_hol)
-        lift        = ((p_hol / max(p_no_hol, 1)) - 1) * 100
+        # ─── Contribución de cada decisión — counterfactual deltas ────────────
+        # Para cada input controlable, muestro: "¿cuánto cambia la predicción
+        # si neutralizo ESA decisión?" → hace visible la contribución de cada
+        # palanca, no solo del precio (que ya está en Fig. 01).
+        _neutral_weather = "Sunny" if "Sunny" in weathers else weathers[0]
+        _neutral_wd = 2  # Wednesday
 
-        fig2 = go.Figure(go.Bar(
-            x=["No Holiday", "Holiday / Promo"],
-            y=[p_no_hol, p_hol],
-            marker_color=[MIST, ESPRESSO_GOLD],
-            text=[f"{p_no_hol:.0f}", f"{p_hol:.0f}"],
-            textposition="outside",
-            textfont=dict(family="Orbitron", size=11),
+        _deltas = []
+        # Holiday
+        _row_no_hol = {**row, "Holiday/Promotion": 0}
+        _d_hol = pred - predict_demand(pipeline, _row_no_hol)
+        _deltas.append((
+            f"Holiday/Promoción: {'ON' if holiday_in else 'OFF'}",
+            _d_hol if holiday_in else 0.0,
+            "vs sin promoción",
         ))
-        fig2.update_layout(
-            title=dict(text=f"Holiday Lift: {lift:+.1f}%", font_family="Orbitron",
-                       font_size=12, font_color=GRAPHITE_DEEP),
-            height=180, margin=dict(t=40, b=20, l=30, r=10),
-            plot_bgcolor="white", paper_bgcolor="white",
-            yaxis=dict(gridcolor=SILVER, showgrid=True),
-            xaxis=dict(gridcolor="rgba(0,0,0,0)"),
-            showlegend=False,
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+        # Discount
+        _row_no_disc = {**row, "Discount": 0}
+        _d_disc = pred - predict_demand(pipeline, _row_no_disc)
+        _deltas.append((
+            f"Discount: {discount_in}%",
+            _d_disc,
+            "vs descuento 0",
+        ))
+        # Weekend (vs Wednesday)
+        _row_wed = {**row, "day_of_week": _neutral_wd, "is_weekend": 0}
+        _d_wd = pred - predict_demand(pipeline, _row_wed)
+        _deltas.append((
+            f"Día: {weekday_in}",
+            _d_wd,
+            "vs Miércoles",
+        ))
+        # Weather (vs Sunny)
+        _row_sunny = {**row, "Weather Condition": _neutral_weather}
+        _d_wx = pred - predict_demand(pipeline, _row_sunny)
+        _deltas.append((
+            f"Clima: {weather_in}",
+            _d_wx,
+            f"vs {_neutral_weather}",
+        ))
+        # Price (vs price 35 mid-range)
+        _row_mid_price = {**row, "Price": 35.0, "price_vs_competitor": 35.0 / max(comp_in, 0.01)}
+        _d_price = pred - predict_demand(pipeline, _row_mid_price)
+        _deltas.append((
+            f"Precio: ${price_in:.1f}",
+            _d_price,
+            "vs precio base $35",
+        ))
+
+        def _fmt_delta(d):
+            color = SUCCESS if d > 0.5 else (DANGER if d < -0.5 else PEBBLE)
+            sign = "+" if d > 0 else ""
+            return f"<b style='color:{color}; font-family:Orbitron,monospace;'>{sign}{d:.1f}</b>"
+
+        _rows_html = "".join([
+            f"""<div style='display:flex; justify-content:space-between; align-items:baseline;
+                           padding:0.4rem 0; border-bottom:1px dashed var(--rule); gap:0.6rem;'>
+                  <span style='color:{SLATE};'>{label}</span>
+                  <span style='display:flex; align-items:baseline; gap:0.5rem;'>
+                    <span style='font-size:0.7rem; color:{PEBBLE}; font-style:italic;
+                                 font-family:"Fraunces",serif;'>{ctx}</span>
+                    {_fmt_delta(delta)}
+                    <span style='font-size:0.65rem; color:{PEBBLE};'>u</span>
+                  </span>
+                </div>"""
+            for label, delta, ctx in _deltas
+        ])
+
+        st.markdown(f"""
+        <div style='background:#FFFFFF; border:1px solid var(--rule);
+                    padding:1rem 1.2rem 0.6rem; margin:0.8rem 0;
+                    font-family:"IBM Plex Mono",monospace; font-size:0.8rem;'>
+          <div style='font-family:"Fraunces",serif; font-style:italic; font-size:1.05rem;
+                      color:{INK}; margin-bottom:0.6rem;'>Contribución de cada decisión</div>
+          <div style='font-size:0.7rem; color:{PEBBLE}; margin-bottom:0.5rem; line-height:1.45;'>
+            Cuánto suma o resta cada input a la predicción actual ({pred_int} u),
+            comparado contra un escenario neutro (sin promo, descuento 0, miércoles, soleado, $35).
+          </div>
+          {_rows_html}
+        </div>
+        """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — INVENTORY DASHBOARD
@@ -1168,26 +1305,10 @@ with tab_reorder:
 
     safety_days = st.slider("Safety Buffer (days)", 3, 14, 7, key="safety")
 
-    recent_df = df.copy()
-    recent_df["Date"] = pd.to_datetime(recent_df["Date"])
-    cutoff = recent_df["Date"].max() - pd.Timedelta(days=30)
-    recent = recent_df[recent_df["Date"] >= cutoff]
+    advisory = compute_advisory(filter_by_sidebar(df, sel_store, sel_category), safety_days=safety_days)
 
-    advisory = (
-        recent.groupby(["Store ID", "Category"])
-        .agg(
-            Avg_Daily_Demand=("Units Sold", "median"),
-            Current_Inventory=("Inventory Level", "last"),
-        )
-        .reset_index()
-    )
-    advisory["Days_of_Supply"] = (advisory["Current_Inventory"] / advisory["Avg_Daily_Demand"].clip(lower=1)).round(1)
-    advisory["Reorder_Qty"]    = advisory.apply(
-        lambda r: reorder_qty(r["Avg_Daily_Demand"], int(r["Current_Inventory"]), safety_days), axis=1
-    )
-    advisory["Risk"] = advisory["Days_of_Supply"].apply(
-        lambda d: "CRITICAL" if d < safety_days * 0.5 else ("LOW STOCK" if d < safety_days else "OK")
-    )
+    if _filter_label:
+        st.caption(f"Filtro del sidebar activo:{_filter_label} · {len(advisory)} SKUs en alcance.")
 
     risk_filter = st.selectbox("Filter by Risk Level", ["All", "CRITICAL", "LOW STOCK", "OK"])
     if risk_filter != "All":
